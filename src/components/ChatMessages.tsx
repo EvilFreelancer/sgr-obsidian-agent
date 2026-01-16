@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ChatMessage } from "../types";
 import { App } from "obsidian";
 
@@ -178,47 +180,6 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
     }
   }, [messages, streamingContent, scrollContainerRef, displayMessages.length]);
 
-  useEffect(() => {
-    // Add click handlers for file mentions after render
-    if (messagesContainerRef.current) {
-      const fileMentions = messagesContainerRef.current.querySelectorAll('.sgr-file-mention');
-      
-      const clickHandlers: Array<{ element: Element; handler: (e: Event) => void }> = [];
-      
-      fileMentions.forEach((mention) => {
-        const filePath = mention.getAttribute('data-file-path');
-        if (filePath) {
-          const handler = (e: Event) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Normalize file path - add .md extension if not present
-            let normalizedPath = filePath;
-            if (!normalizedPath.endsWith('.md') && !normalizedPath.includes('.')) {
-              normalizedPath = normalizedPath + '.md';
-            }
-            
-            try {
-              app.workspace.openLinkText(normalizedPath, '', true);
-            } catch (error) {
-              console.error('Failed to open file:', normalizedPath, error);
-            }
-          };
-          
-          mention.addEventListener('click', handler);
-          clickHandlers.push({ element: mention, handler });
-        }
-      });
-      
-      // Cleanup: remove event listeners when component unmounts or dependencies change
-      return () => {
-        clickHandlers.forEach(({ element, handler }) => {
-          element.removeEventListener('click', handler);
-        });
-      };
-    }
-  }, [messages, streamingContent, app]);
-
   return (
     <div className="sgr-chat-messages" ref={messagesContainerRef}>
       {displayMessages.length === 0 && (
@@ -235,21 +196,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
           </div>
           <div className="sgr-message-content">
-            {message.role === "assistant" ? (
-              <div
-                className="sgr-markdown"
-                dangerouslySetInnerHTML={{
-                  __html: formatMarkdownWithFileMentions(message.content),
-                }}
-              />
-            ) : (
-              <div 
-                className="sgr-message-text"
-                dangerouslySetInnerHTML={{
-                  __html: formatMarkdownWithFileMentions(message.content),
-                }}
-              />
-            )}
+            <MarkdownContent
+              content={message.content}
+              app={app}
+              className={message.role === "assistant" ? "sgr-markdown" : "sgr-message-text"}
+            />
           </div>
         </div>
       ))}
@@ -259,11 +210,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             <strong>Assistant</strong>
           </div>
           <div className="sgr-message-content">
-            <div
+            <MarkdownContent
+              content={streamingContent}
+              app={app}
               className="sgr-markdown"
-              dangerouslySetInnerHTML={{
-                __html: formatMarkdownWithFileMentions(streamingContent),
-              }}
             />
           </div>
         </div>
@@ -272,75 +222,107 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   );
 };
 
-// Simple markdown formatter (basic implementation)
-function formatMarkdown(text: string): string {
-  // Escape HTML
-  let html = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // Code blocks
-  html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Bold
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
-  // Italic
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
-  // Line breaks
-  html = html.replace(/\n/g, "<br>");
-
-  return html;
+// Component for rendering markdown content with file mentions support
+interface MarkdownContentProps {
+  content: string;
+  app: App;
+  className?: string;
 }
 
-// Format markdown with clickable file mentions
-function formatMarkdownWithFileMentions(text: string): string {
-  // First, remove file context blocks [File: ...] and replace with placeholder
-  // Pattern: [File: path]\ncontent\n[/File]
-  // This must be done before markdown formatting to avoid issues
-  const fileBlockPlaceholders: Array<{ placeholder: string; replacement: string }> = [];
-  let processedText = text.replace(/\[File:\s*([^\]]+)\][\s\S]*?\[\/File\]/g, (match, filePath) => {
-    // Extract just the filename from path
-    const fileName = filePath.split('/').pop() || filePath;
-    const placeholder = `__FILE_BLOCK_${fileBlockPlaceholders.length}__`;
-    // Escape filePath for HTML attribute
-    const escapedPath = filePath
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-    const replacement = `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
-    fileBlockPlaceholders.push({ placeholder, replacement });
-    return placeholder;
-  });
-  
-  // Format regular markdown
-  let html = formatMarkdown(processedText);
-  
-  // Replace placeholders with actual file links
-  fileBlockPlaceholders.forEach(({ placeholder, replacement }) => {
-    html = html.replace(placeholder, replacement);
-  });
-  
-  // Then add file mentions as clickable links (without square brackets in display)
-  // Pattern: @[[filename]] or @[[path/to/file.md]]
-  html = html.replace(/@\[\[([^\]]+)\]\]/g, (match, filePath) => {
-    // Extract just the filename from path
-    const fileName = filePath.split('/').pop() || filePath;
-    // Escape filePath for HTML attribute
-    const escapedPath = filePath
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-    return `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
-  });
-  
-  return html;
-}
+const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, app, className }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Preprocess content: replace file mentions and file blocks with placeholders
+  const preprocessContent = (text: string): string => {
+    // Remove file context blocks [File: ...] and replace with placeholder
+    // Pattern: [File: path]\ncontent\n[/File]
+    let processed = text.replace(/\[File:\s*([^\]]+)\][\s\S]*?\[\/File\]/g, (match, filePath) => {
+      const fileName = filePath.split('/').pop() || filePath;
+      return `__FILE_BLOCK_PLACEHOLDER__${filePath}__FILE_BLOCK_PLACEHOLDER__`;
+    });
+
+    // Replace @[[filename]] mentions with placeholders
+    processed = processed.replace(/@\[\[([^\]]+)\]\]/g, (match, filePath) => {
+      return `__FILE_MENTION_PLACEHOLDER__${filePath}__FILE_MENTION_PLACEHOLDER__`;
+    });
+
+    return processed;
+  };
+
+  // Process rendered content to replace placeholders with clickable file mentions
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current;
+
+    // Replace file block placeholders
+    const fileBlockRegex = /__FILE_BLOCK_PLACEHOLDER__([^_]+)__FILE_BLOCK_PLACEHOLDER__/g;
+    let html = container.innerHTML;
+    html = html.replace(fileBlockRegex, (match, filePath) => {
+      const fileName = filePath.split('/').pop() || filePath;
+      const escapedPath = filePath
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+      return `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
+    });
+
+    // Replace file mention placeholders
+    const fileMentionRegex = /__FILE_MENTION_PLACEHOLDER__([^_]+)__FILE_MENTION_PLACEHOLDER__/g;
+    html = html.replace(fileMentionRegex, (match, filePath) => {
+      const fileName = filePath.split('/').pop() || filePath;
+      const escapedPath = filePath
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+      return `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
+    });
+
+    container.innerHTML = html;
+
+    // Add click handlers for file mentions
+    const fileMentions = container.querySelectorAll('.sgr-file-mention');
+    const clickHandlers: Array<{ element: Element; handler: (e: Event) => void }> = [];
+
+    fileMentions.forEach((mention) => {
+      const filePath = mention.getAttribute('data-file-path');
+      if (filePath) {
+        const handler = (e: Event) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Normalize file path - add .md extension if not present
+          let normalizedPath = filePath;
+          if (!normalizedPath.endsWith('.md') && !normalizedPath.includes('.')) {
+            normalizedPath = normalizedPath + '.md';
+          }
+
+          try {
+            app.workspace.openLinkText(normalizedPath, '', true);
+          } catch (error) {
+            console.error('Failed to open file:', normalizedPath, error);
+          }
+        };
+
+        mention.addEventListener('click', handler);
+        clickHandlers.push({ element: mention, handler });
+      }
+    });
+
+    return () => {
+      clickHandlers.forEach(({ element, handler }) => {
+        element.removeEventListener('click', handler);
+      });
+    };
+  }, [content, app]);
+
+  const processedContent = preprocessContent(content);
+
+  return (
+    <div ref={containerRef} className={className}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {processedContent}
+      </ReactMarkdown>
+    </div>
+  );
+};

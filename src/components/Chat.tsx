@@ -84,14 +84,25 @@ export const Chat: React.FC<ChatProps> = ({
   // Handle mode change
   const handleModeChange = useCallback(async (newMode: ChatMode) => {
     setMode(newMode);
-    const currentModel = model || defaultModel;
-    if (currentModel) {
-      chatManager.clearSession();
-      chatManager.startSession(newMode, currentModel);
+    
+    // Update mode in current session without clearing it
+    const session = chatManager.getCurrentSession();
+    if (session) {
+      // Update mode in existing session
+      chatManager.updateMode(newMode);
       updateMessagesFromSession();
-      setStreamingContent("");
-      setIsStreaming(false);
+    } else {
+      // If no session exists, start a new one
+      const currentModel = model || defaultModel;
+      if (currentModel) {
+        chatManager.startSession(newMode, currentModel);
+        updateMessagesFromSession();
+      }
     }
+    
+    setStreamingContent("");
+    setIsStreaming(false);
+    
     // Save mode to settings
     await onModeChangeSettings(newMode);
   }, [chatManager, model, defaultModel, updateMessagesFromSession, onModeChangeSettings]);

@@ -59,6 +59,32 @@ export class ChatManager {
     });
   }
 
+  updateMode(newMode: ChatMode): void {
+    if (!this.currentSession) {
+      return;
+    }
+
+    // Update mode in session
+    this.currentSession.mode = newMode;
+
+    // Update system message (first message should be system)
+    const systemPrompt = SYSTEM_PROMPTS[newMode];
+    const systemMessageIndex = this.currentSession.messages.findIndex(
+      msg => msg.role === 'system'
+    );
+    
+    if (systemMessageIndex >= 0) {
+      // Update existing system message
+      this.currentSession.messages[systemMessageIndex].content = systemPrompt;
+    } else {
+      // Add system message if it doesn't exist (shouldn't happen, but just in case)
+      this.currentSession.messages.unshift({
+        role: 'system',
+        content: systemPrompt,
+      });
+    }
+  }
+
   addFileContext(filePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.currentSession) {
