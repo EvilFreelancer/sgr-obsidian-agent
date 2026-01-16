@@ -2,15 +2,14 @@ import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { VIEW_TYPE_HISTORY } from "../constants";
-import { ChatHistory, ChatHistoryRef } from "./ChatHistory";
+import { ChatHistory } from "./ChatHistory";
 import { MessageRepository } from "../core/MessageRepository";
 import SGRPlugin from "../main";
 
 export class ChatHistoryView extends ItemView {
   plugin: SGRPlugin;
   root: Root | null = null;
-  private refreshKey: number = 0;
-  private chatHistoryRef: React.RefObject<ChatHistoryRef> | null = null;
+  private refreshFn: (() => Promise<void>) | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: SGRPlugin) {
     super(leaf);
@@ -54,36 +53,22 @@ export class ChatHistoryView extends ItemView {
       return;
     }
 
-    // Increment refresh key to trigger list refresh
-    this.refreshKey++;
-    this.chatHistoryRef = React.createRef<ChatHistoryRef>();
-    
-    // Refresh list when view becomes active
-    const refreshList = () => {
-      if (this.chatHistoryRef?.current) {
-        this.chatHistoryRef.current.refresh();
-      }
-    };
-
-    // Register workspace event to refresh when view becomes active
-    this.registerEvent(
-      this.app.workspace.on('active-leaf-change', () => {
-        const activeLeaf = this.app.workspace.getActiveViewOfType(ChatHistoryView);
-        if (activeLeaf === this) {
-          refreshList();
-        }
-      })
-    );
-
-    // Register vault event to refresh when chat files are created/modified
-    const chatHistoryFolder = this.plugin.settings.chatHistoryFolder;
+    // Normalize folder path for event matching
+    const chatHistoryFolder = messageRepo.getFolderPath();
     const normalizedFolder = chatHistoryFolder.startsWith('/') 
       ? chatHistoryFolder.slice(1) 
       : chatHistoryFolder;
     const folderPath = normalizedFolder.endsWith('/') 
       ? normalizedFolder 
       : normalizedFolder + '/';
-    
+
+    const refreshList = () => {
+      if (this.refreshFn) {
+        this.refreshFn();
+      }
+    };
+
+    // Register vault events to refresh list when chat files change
     this.registerEvent(
       this.app.vault.on('create', (file) => {
         if (file.path.startsWith(folderPath) && file.path.endsWith('.json')) {
@@ -105,13 +90,11 @@ export class ChatHistoryView extends ItemView {
         }
       })
     );
-    
+
     this.root = createRoot(contentEl);
     this.root.render(
       <ChatHistory
-        ref={this.chatHistoryRef}
         messageRepo={messageRepo}
-        refreshKey={this.refreshKey}
         onLoadChat={async (filePath: string) => {
           const chatManager = this.plugin.getChatManager();
           if (chatManager) {
@@ -144,6 +127,9 @@ export class ChatHistoryView extends ItemView {
         }}
         onBack={() => {
           this.plugin.activateView();
+        }}
+        onRefresh={(refreshFn) => {
+          this.refreshFn = refreshFn;
         }}
       />
     );

@@ -17,6 +17,10 @@ export class MessageRepository {
     this.folderPath = folderPath;
   }
 
+  getFolderPath(): string {
+    return this.folderPath;
+  }
+
   async saveChat(
     messages: ChatMessage[],
     metadata: ChatHistoryMetadata

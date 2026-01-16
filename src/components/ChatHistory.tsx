@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { MessageRepository } from "../core/MessageRepository";
 import { ChatHistoryMetadata } from "../types";
 import { Button } from "./ui/Button";
@@ -9,11 +9,7 @@ interface ChatHistoryProps {
   onLoadChat: (filePath: string) => void;
   onDeleteChat: (filePath: string) => Promise<void>;
   onBack: () => void;
-  refreshKey?: number;
-}
-
-export interface ChatHistoryRef {
-  refresh: () => void;
+  onRefresh?: (refreshFn: () => Promise<void>) => void;
 }
 
 interface ChatItem {
@@ -21,18 +17,18 @@ interface ChatItem {
   metadata: ChatHistoryMetadata;
 }
 
-export const ChatHistory = forwardRef<ChatHistoryRef, ChatHistoryProps>(({
+export const ChatHistory: React.FC<ChatHistoryProps> = ({
   messageRepo,
   onLoadChat,
   onDeleteChat,
   onBack,
-  refreshKey,
-}, ref) => {
+  onRefresh,
+}) => {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const loadChats = async () => {
+  const loadChats = useCallback(async () => {
     setLoading(true);
     try {
       const chatList = await messageRepo.listChats();
@@ -42,15 +38,18 @@ export const ChatHistory = forwardRef<ChatHistoryRef, ChatHistoryProps>(({
     } finally {
       setLoading(false);
     }
-  };
-
-  useImperativeHandle(ref, () => ({
-    refresh: loadChats,
-  }));
+  }, [messageRepo]);
 
   useEffect(() => {
     loadChats();
-  }, [refreshKey]);
+  }, [loadChats]);
+
+  // Expose refresh function to parent via callback
+  useEffect(() => {
+    if (onRefresh) {
+      onRefresh(loadChats);
+    }
+  }, [onRefresh, loadChats]);
 
   // Filter chats using BM25 search
   const filteredChats = useMemo(() => {
@@ -62,11 +61,13 @@ export const ChatHistory = forwardRef<ChatHistoryRef, ChatHistoryProps>(({
 
   const handleDelete = async (e: React.MouseEvent, filePath: string) => {
     e.stopPropagation(); // Prevent triggering chat load
+    e.preventDefault(); // Prevent default behavior
     try {
       // Check if this is the current chat and handle it
       await onDeleteChat(filePath);
       // Delete the chat file
       await messageRepo.deleteChat(filePath);
+      // List will be refreshed automatically via vault events, but refresh manually too
       await loadChats();
     } catch (error) {
       console.error("Failed to delete chat:", error);
@@ -130,4 +131,4 @@ export const ChatHistory = forwardRef<ChatHistoryRef, ChatHistoryProps>(({
       </div>
     </div>
   );
-});
+};
