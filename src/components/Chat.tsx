@@ -247,9 +247,7 @@ export const Chat: React.FC<ChatProps> = ({
             onClick={onOpenSettings}
             title="Settings"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 0a1 1 0 00-1 1v1.5a5.5 5.5 0 00-4.5 4.5H1a1 1 0 000 2h1.5a5.5 5.5 0 004.5 4.5V15a1 1 0 002 0v-1.5a5.5 5.5 0 004.5-4.5H15a1 1 0 000-2h-1.5A5.5 5.5 0 009 2.5V1a1 1 0 00-1-1zM6.5 4a3.5 3.5 0 103 0 3.5 3.5 0 00-3 0z" />
-            </svg>
+            ⚙️
           </button>
         </div>
       </div>
