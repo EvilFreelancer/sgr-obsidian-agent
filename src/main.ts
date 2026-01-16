@@ -30,7 +30,9 @@ export default class SGRPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, getDefaultSettings(), await this.loadData());
+    const loadedData = await this.loadData();
+    // Handle case when no data exists (first load or after clear)
+    this.settings = Object.assign({}, getDefaultSettings(), loadedData || {});
   }
 
   async saveSettings(): Promise<void> {
@@ -68,6 +70,8 @@ export default class SGRPlugin extends Plugin {
     } else {
       this.chatManager = null;
     }
+    // Update all open views when ChatManager state changes
+    this.updateViews();
   }
 
   updateMessageRepository(): void {
@@ -83,6 +87,17 @@ export default class SGRPlugin extends Plugin {
 
   getChatManager(): ChatManager | null {
     return this.chatManager;
+  }
+
+  private updateViews(): void {
+    // Update all open AgentView instances when ChatManager state changes
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE);
+    for (const leaf of leaves) {
+      if (leaf.view instanceof AgentView) {
+        // Re-open the view to refresh its content
+        leaf.view.onOpen();
+      }
+    }
   }
 
   async activateView(): Promise<void> {

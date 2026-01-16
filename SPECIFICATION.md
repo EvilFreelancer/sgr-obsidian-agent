@@ -1,82 +1,82 @@
-# Спецификация плагина SGR Obsidian Agent
+# SGR Obsidian Agent Plugin Specification
 
-## Обзор
+## Overview
 
-Плагин **SGR Obsidian Agent** - это AI-ассистент для Obsidian, работающий с LLM через OpenAI-совместимый API в формате агента. Плагин предоставляет боковую панель с чатом, аналогичную реализациям в VS Code и Cursor.
+The **SGR Obsidian Agent** plugin is an AI assistant for Obsidian that works with LLM through an OpenAI-compatible API in agent format. The plugin provides a sidebar chat interface similar to implementations in VS Code and Cursor.
 
-## Основные требования
+## Core Requirements
 
-### 1. Архитектура плагина
+### 1. Plugin Architecture
 
-#### 1.1 Структура проекта
+#### 1.1 Project Structure
 ```
 sgr-obsidian-agent/
-├── manifest.json          # Метаданные плагина
-├── package.json          # Зависимости и скрипты
-├── tsconfig.json         # Конфигурация TypeScript
-├── esbuild.config.mjs    # Конфигурация сборки
+├── manifest.json          # Plugin metadata
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+├── esbuild.config.mjs    # Build configuration
 ├── src/
-│   ├── main.ts           # Точка входа плагина
-│   ├── constants.ts      # Константы и типы
-│   ├── components/       # React компоненты
-│   │   ├── AgentView.tsx # Основной вид боковой панели
-│   │   ├── Chat.tsx      # Компонент чата
-│   │   ├── ChatInput.tsx # Поле ввода сообщений
-│   │   ├── ChatMessages.tsx # Отображение сообщений
-│   │   ├── ChatControls.tsx # Управление чатом
-│   │   ├── ModelSelector.tsx # Селектор моделей
-│   │   ├── ChatHistory.tsx # История чатов
-│   │   └── ui/           # UI компоненты (кнопки, селекторы и т.д.)
-│   ├── settings/         # Настройки плагина
-│   │   ├── model.ts      # Модель настроек
-│   │   └── SettingsTab.tsx # Вкладка настроек
-│   ├── core/             # Основная логика
-│   │   ├── ChatManager.ts # Управление чатом
-│   │   ├── MessageRepository.ts # Репозиторий сообщений
-│   │   └── LLMClient.ts   # Клиент для работы с LLM API
-│   ├── utils/            # Утилиты
-│   └── types/            # TypeScript типы
-└── styles.css            # Стили плагина
+│   ├── main.ts           # Plugin entry point
+│   ├── constants.ts      # Constants and types
+│   ├── components/       # React components
+│   │   ├── AgentView.tsx # Main sidebar view
+│   │   ├── Chat.tsx      # Chat component
+│   │   ├── ChatInput.tsx # Message input field
+│   │   ├── ChatMessages.tsx # Message display
+│   │   ├── ChatControls.tsx # Chat controls
+│   │   ├── ModelSelector.tsx # Model selector
+│   │   ├── ChatHistory.tsx # Chat history
+│   │   └── ui/           # UI components (buttons, selectors, etc.)
+│   ├── settings/         # Plugin settings
+│   │   ├── model.ts      # Settings model
+│   │   └── SettingsTab.tsx # Settings tab
+│   ├── core/             # Core logic
+│   │   ├── ChatManager.ts # Chat management
+│   │   ├── MessageRepository.ts # Message repository
+│   │   └── LLMClient.ts   # LLM API client
+│   ├── utils/            # Utilities
+│   └── types/            # TypeScript types
+└── styles.css            # Plugin styles
 ```
 
-#### 1.2 Технологический стек
-- **TypeScript** - основной язык разработки
-- **React** - для UI компонентов
-- **Obsidian API** - для интеграции с Obsidian
-- **esbuild** - для сборки
-- **Tailwind CSS** (опционально) - для стилизации
+#### 1.2 Technology Stack
+- **TypeScript** - main development language
+- **React** - for UI components
+- **Obsidian API** - for Obsidian integration
+- **esbuild** - for building
+- **Tailwind CSS** (optional) - for styling
 
-### 2. Функциональные требования
+### 2. Functional Requirements
 
-#### 2.1 Боковая панель чата
+#### 2.1 Chat Sidebar
 
-**Требования:**
-- Боковая панель открывается справа по нажатию на кнопку с иконкой чата
-- Иконка должна быть доступна в интерфейсе Obsidian (ribbon icon)
-- Панель должна быть зарегистрирована как кастомный view через `registerView()`
+**Requirements:**
+- Sidebar opens on the right when clicking the chat icon button
+- Icon should be available in Obsidian interface (ribbon icon)
+- Panel must be registered as a custom view via `registerView()`
 - View type: `"sgr-agent-chat-view"`
 
-**Реализация:**
+**Implementation:**
 ```typescript
-// В main.ts
+// In main.ts
 this.registerView(VIEW_TYPE, (leaf: WorkspaceLeaf) => new AgentView(leaf, this));
 this.addRibbonIcon("message-square", "Open SGR Agent", () => this.activateView());
 ```
 
-#### 2.2 Настройки плагина
+#### 2.2 Plugin Settings
 
-**Обязательные настройки:**
-- `baseUrl` (string) - базовый URL для OpenAI-совместимого API
-- `apiKey` (string) - API ключ для аутентификации
-- `proxy` (string, опционально) - URL прокси-сервера
+**Required Settings:**
+- `baseUrl` (string) - base URL for OpenAI-compatible API
+- `apiKey` (string) - API key for authentication
+- `proxy` (string, optional) - proxy server URL
 
-**Дополнительные настройки:**
-- `defaultModel` (string) - модель по умолчанию
-- `temperature` (number) - температура модели (0-2)
-- `maxTokens` (number) - максимальное количество токенов
-- `chatHistoryFolder` (string) - папка для сохранения истории чатов
+**Additional Settings:**
+- `defaultModel` (string) - default model
+- `temperature` (number) - model temperature (0-2)
+- `maxTokens` (number) - maximum number of tokens
+- `chatHistoryFolder` (string) - folder for saving chat history
 
-**Интерфейс настроек:**
+**Settings Interface:**
 ```typescript
 interface AgentSettings {
   baseUrl: string;
@@ -89,44 +89,44 @@ interface AgentSettings {
 }
 ```
 
-**UI настроек:**
-- Вкладка настроек должна быть доступна через `addSettingTab()`
-- Поля для ввода: baseUrl, apiKey, proxy
-- Валидация обязательных полей
-- Шифрование API ключа (опционально)
+**Settings UI:**
+- Settings tab should be accessible via `addSettingTab()`
+- Input fields: baseUrl, apiKey, proxy
+- Validation of required fields
+- API key encryption (optional)
 
-#### 2.3 Подключение файлов через @
+#### 2.3 File Attachment via @
 
-**Требования:**
-- При вводе символа `@` в поле ввода должен появляться автокомплит
-- Автокомплит должен показывать файлы из vault
-- При выборе файла он должен быть добавлен в контекст чата
-- Файлы должны отображаться как "пилюли" (pills) в поле ввода
-- Поддерживаемые форматы: `.md`, `.txt` (можно расширить)
+**Requirements:**
+- When typing `@` in the input field, autocomplete should appear
+- Autocomplete should show files from vault
+- When selecting a file, it should be added to chat context
+- Files should be displayed as "pills" in the input field
+- Supported formats: `.md`, `.txt` (can be extended)
 
-**Реализация:**
-- Использовать Lexical editor (как в obsidian-copilot) или простой textarea с автокомплитом
-- Парсинг упоминаний через регулярные выражения: `@\[\[filename\]\]` или `@filename`
-- Хранение списка подключенных файлов в состоянии компонента
-- Передача файлов в контекст при отправке сообщения
+**Implementation:**
+- Use Lexical editor (as in obsidian-copilot) or simple textarea with autocomplete
+- Parse mentions using regular expressions: `@\[\[filename\]\]` or `@filename`
+- Store list of attached files in component state
+- Pass files to context when sending message
 
-**Пример использования:**
+**Usage Example:**
 ```
-Пользователь вводит: "Проанализируй @[[my-note.md]] и @[[another-file.md]]"
-Результат: два файла добавляются в контекст сообщения
+User types: "Analyze @[[my-note.md]] and @[[another-file.md]]"
+Result: two files are added to message context
 ```
 
-#### 2.4 Режимы общения
+#### 2.4 Chat Modes
 
-**Три режима:**
-1. **Agent** - режим агента с автономным выполнением задач
-2. **Ask** - простой режим вопрос-ответ
-3. **Plan** - режим планирования с пошаговым выполнением
+**Three Modes:**
+1. **Agent** - agent mode with autonomous task execution
+2. **Ask** - simple Q&A mode
+3. **Plan** - planning mode with step-by-step execution
 
-**Реализация:**
-- Переключатель режимов в UI (кнопки или dropdown)
-- Разные system prompts для каждого режима
-- Различная обработка ответов в зависимости от режима
+**Implementation:**
+- Mode switcher in UI (buttons or dropdown)
+- Different system prompts for each mode
+- Different response handling depending on mode
 
 **System Prompts:**
 
@@ -146,15 +146,15 @@ You are a helpful assistant. Answer questions directly and concisely.
 You are a planning assistant. Break down tasks into steps and execute them systematically.
 ```
 
-#### 2.5 Селектор моделей
+#### 2.5 Model Selector
 
-**Требования:**
-- Загрузка списка моделей через запрос к `/models` endpoint
-- Отображение списка моделей в dropdown/select
-- Кэширование списка моделей
-- Обновление списка по кнопке или автоматически при изменении baseUrl
+**Requirements:**
+- Load model list via request to `/models` endpoint
+- Display model list in dropdown/select
+- Cache model list
+- Update list via button or automatically when baseUrl changes
 
-**Реализация:**
+**Implementation:**
 ```typescript
 async function fetchModels(baseUrl: string, apiKey: string): Promise<Model[]> {
   const response = await fetch(`${baseUrl}/models`, {
@@ -169,23 +169,23 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<Model[]> {
 ```
 
 **UI:**
-- Dropdown с поиском по моделям
-- Отображение названия модели и провайдера (если доступно)
-- Индикатор загрузки при получении списка
+- Dropdown with model search
+- Display model name and provider (if available)
+- Loading indicator when fetching list
 
-#### 2.6 История чатов
+#### 2.6 Chat History
 
-**Требования:**
-- Сохранение истории чатов в markdown файлы
-- Кнопка для открытия истории чатов
-- Список предыдущих сессий с датой и временем
-- Возможность загрузить предыдущую сессию
-- Возможность удалить сессию
-- Автосохранение текущего чата (опционально)
+**Requirements:**
+- Save chat history to markdown files
+- Button to open chat history
+- List of previous sessions with date and time
+- Ability to load previous session
+- Ability to delete session
+- Auto-save current chat (optional)
 
-**Формат сохранения:**
-- Markdown файлы в папке `chatHistoryFolder`
-- Frontmatter с метаданными:
+**Save Format:**
+- Markdown files in `chatHistoryFolder`
+- Frontmatter with metadata:
   ```yaml
   ---
   title: "Chat Title"
@@ -195,7 +195,7 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<Model[]> {
   mode: "agent"
   ---
   ```
-- Тело файла содержит историю сообщений в формате:
+- File body contains message history in format:
   ```markdown
   ## User
   Message text
@@ -204,17 +204,17 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<Model[]> {
   Response text
   ```
 
-**UI истории:**
-- Popover или модальное окно со списком чатов
-- Сортировка по дате (новые сверху)
-- Поиск по названию чата
-- Кнопки: "Загрузить", "Удалить", "Открыть файл"
+**History UI:**
+- Popover or modal window with chat list
+- Sort by date (newest first)
+- Search by chat title
+- Buttons: "Load", "Delete", "Open File"
 
-### 3. Технические детали
+### 3. Technical Details
 
-#### 3.1 Интеграция с LLM API
+#### 3.1 LLM API Integration
 
-**OpenAI-совместимый формат:**
+**OpenAI-compatible Format:**
 ```typescript
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -230,30 +230,30 @@ interface ChatRequest {
 }
 ```
 
-**Streaming ответов:**
-- Поддержка Server-Sent Events (SSE) для потоковой передачи
-- Обновление UI в реальном времени по мере получения токенов
+**Response Streaming:**
+- Support for Server-Sent Events (SSE) for streaming
+- Real-time UI updates as tokens are received
 
-**Обработка ошибок:**
-- Валидация API ключа
-- Обработка сетевых ошибок
-- Обработка ошибок API (rate limits, invalid model и т.д.)
-- Понятные сообщения об ошибках для пользователя
+**Error Handling:**
+- API key validation
+- Network error handling
+- API error handling (rate limits, invalid model, etc.)
+- User-friendly error messages
 
-#### 3.2 Управление состоянием
+#### 3.2 State Management
 
-**Использование React hooks:**
-- `useState` для локального состояния компонентов
-- `useEffect` для побочных эффектов
-- `useContext` для глобального состояния (опционально)
+**Using React Hooks:**
+- `useState` for local component state
+- `useEffect` for side effects
+- `useContext` for global state (optional)
 
-**Хранение настроек:**
-- Использование `loadData()` и `saveData()` из Obsidian API
-- Атомарное обновление настроек через `setSettings()`
+**Settings Storage:**
+- Use `loadData()` and `saveData()` from Obsidian API
+- Atomic settings updates via `setSettings()`
 
-#### 3.3 Контекст файлов
+#### 3.3 File Context
 
-**Обработка подключенных файлов:**
+**Handling Attached Files:**
 ```typescript
 interface FileContext {
   path: string;
@@ -265,89 +265,89 @@ interface FileContext {
 }
 ```
 
-**Добавление контекста в промпт:**
-- Файлы добавляются в system message или как отдельные сообщения
-- Формат: `[File: filename.md]\n{content}\n[/File]`
+**Adding Context to Prompt:**
+- Files are added to system message or as separate messages
+- Format: `[File: filename.md]\n{content}\n[/File]`
 
-### 4. UI/UX требования
+### 4. UI/UX Requirements
 
-#### 4.1 Дизайн интерфейса
-- Минималистичный дизайн в стиле Obsidian
-- Адаптивность под темную/светлую тему
-- Плавные анимации и переходы
-- Индикаторы загрузки для долгих операций
+#### 4.1 Interface Design
+- Minimalist design in Obsidian style
+- Adaptability to dark/light theme
+- Smooth animations and transitions
+- Loading indicators for long operations
 
-#### 4.2 Компоненты интерфейса
+#### 4.2 Interface Components
 
-**Боковая панель:**
-- Заголовок с названием плагина
-- Кнопки режимов (Agent, Ask, Plan)
-- Селектор моделей
-- Кнопка истории чатов
-- Область сообщений (scrollable)
-- Поле ввода с поддержкой @ упоминаний
-- Кнопка отправки
+**Sidebar:**
+- Header with plugin name
+- Mode buttons (Agent, Ask, Plan)
+- Model selector
+- Chat history button
+- Message area (scrollable)
+- Input field with @ mention support
+- Send button
 
-**Сообщения:**
-- Разделение сообщений пользователя и ассистента
-- Markdown рендеринг для ответов
-- Подсветка кода (если есть)
-- Копирование сообщений
-- Редактирование своих сообщений
+**Messages:**
+- Separation of user and assistant messages
+- Markdown rendering for responses
+- Code highlighting (if available)
+- Copy messages
+- Edit own messages
 
-### 5. Сравнение с obsidian-copilot
+### 5. Comparison with obsidian-copilot
 
-**Сходства:**
-- Использование React для UI
-- Боковая панель как кастомный view
-- Система настроек с API ключами
-- Поддержка упоминаний файлов
-- История чатов в markdown файлах
-- Селектор моделей
+**Similarities:**
+- Use of React for UI
+- Sidebar as custom view
+- Settings system with API keys
+- File mention support
+- Chat history in markdown files
+- Model selector
 
-**Отличия:**
-- Упрощенная архитектура (без сложных chain runners)
-- Фокус на OpenAI-совместимом API
-- Три четких режима вместо множества chain types
-- Более простая система контекста (только файлы через @)
-- Нет поддержки проектов и сложных инструментов
+**Differences:**
+- Simplified architecture (without complex chain runners)
+- Focus on OpenAI-compatible API
+- Three clear modes instead of multiple chain types
+- Simpler context system (only files via @)
+- No support for projects and complex tools
 
-### 6. Этапы разработки
+### 6. Development Stages
 
-#### Этап 1: Базовая структура
-- [ ] Создание структуры проекта
-- [ ] Настройка сборки (esbuild, TypeScript)
-- [ ] Базовый main.ts с регистрацией плагина
-- [ ] Простая боковая панель (без функционала)
+#### Stage 1: Basic Structure
+- [ ] Create project structure
+- [ ] Setup build (esbuild, TypeScript)
+- [ ] Basic main.ts with plugin registration
+- [ ] Simple sidebar (without functionality)
 
-#### Этап 2: Настройки
-- [ ] Модель настроек
-- [ ] UI вкладки настроек
-- [ ] Сохранение/загрузка настроек
-- [ ] Валидация настроек
+#### Stage 2: Settings
+- [ ] Settings model
+- [ ] Settings tab UI
+- [ ] Settings save/load
+- [ ] Settings validation
 
-#### Этап 3: Базовый чат
-- [ ] Компонент чата
-- [ ] Поле ввода и отправка сообщений
-- [ ] Интеграция с LLM API
-- [ ] Отображение сообщений
-- [ ] Обработка ошибок
+#### Stage 3: Basic Chat
+- [ ] Chat component
+- [ ] Input field and message sending
+- [ ] LLM API integration
+- [ ] Message display
+- [ ] Error handling
 
-#### Этап 4: Расширенный функционал
-- [ ] Подключение файлов через @
-- [ ] Режимы общения
-- [ ] Селектор моделей
-- [ ] История чатов
+#### Stage 4: Extended Functionality
+- [ ] File attachment via @
+- [ ] Chat modes
+- [ ] Model selector
+- [ ] Chat history
 
-#### Этап 5: Полировка
-- [ ] Улучшение UI/UX
-- [ ] Оптимизация производительности
-- [ ] Тестирование
-- [ ] Документация
+#### Stage 5: Polish
+- [ ] UI/UX improvements
+- [ ] Performance optimization
+- [ ] Testing
+- [ ] Documentation
 
-### 7. Зависимости
+### 7. Dependencies
 
-**Основные зависимости:**
+**Main Dependencies:**
 ```json
 {
   "dependencies": {
@@ -365,45 +365,45 @@ interface FileContext {
 }
 ```
 
-### 8. Примеры использования
+### 8. Usage Examples
 
-**Базовое использование:**
-1. Пользователь открывает боковую панель
-2. Выбирает режим "Ask"
-3. Выбирает модель из списка
-4. Вводит вопрос и отправляет
-5. Получает ответ от LLM
+**Basic Usage:**
+1. User opens sidebar
+2. Selects "Ask" mode
+3. Selects model from list
+4. Enters question and sends
+5. Receives response from LLM
 
-**С контекстом файлов:**
-1. Пользователь вводит `@[[my-note]]` в поле ввода
-2. Выбирает файл из автокомплита
-3. Файл добавляется в контекст
-4. Отправляет сообщение с вопросом о файле
-5. LLM получает контекст файла и отвечает
+**With File Context:**
+1. User types `@[[my-note]]` in input field
+2. Selects file from autocomplete
+3. File is added to context
+4. Sends message with question about file
+5. LLM receives file context and responds
 
-**Загрузка истории:**
-1. Пользователь нажимает кнопку истории
-2. Видит список предыдущих чатов
-3. Выбирает нужный чат
-4. История загружается в текущую сессию
-5. Может продолжить разговор
+**Loading History:**
+1. User clicks history button
+2. Sees list of previous chats
+3. Selects desired chat
+4. History loads into current session
+5. Can continue conversation
 
-### 9. Будущие улучшения
+### 9. Future Improvements
 
-**Возможные расширения:**
-- Поддержка изображений в сообщениях
-- Голосовой ввод
-- Экспорт чатов в различные форматы
-- Интеграция с другими инструментами Obsidian
-- Поддержка кастомных промптов
-- Темы оформления
+**Possible Extensions:**
+- Image support in messages
+- Voice input
+- Export chats to various formats
+- Integration with other Obsidian tools
+- Custom prompt support
+- Theme customization
 
 ---
 
-## Примечания
+## Notes
 
-- Спецификация основана на изучении кода `obsidian-copilot`
-- Архитектура упрощена для более быстрой разработки
-- Фокус на базовом функционале с возможностью расширения
-- Все комментарии в коде должны быть на английском языке
-- Ответы пользователю на русском языке (если не указано иное)
+- Specification is based on studying `obsidian-copilot` code
+- Architecture is simplified for faster development
+- Focus on basic functionality with possibility for extension
+- All code comments must be in English
+- User responses in Russian (unless otherwise specified)

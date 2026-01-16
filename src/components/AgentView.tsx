@@ -30,15 +30,40 @@ export class AgentView extends ItemView {
 
   async onOpen(): Promise<void> {
     const { contentEl } = this;
+    
+    // Clean up existing React root if view is being reopened
+    if (this.root) {
+      this.root.unmount();
+      this.root = null;
+    }
+    
     contentEl.empty();
     contentEl.addClass("sgr-agent-view");
 
     const chatManager = this.plugin.getChatManager();
     if (!chatManager) {
-      contentEl.createDiv({
-        text: "Please configure API settings in plugin settings first.",
+      const errorContainer = contentEl.createDiv({
         cls: "sgr-error-message",
       });
+      
+      errorContainer.createDiv({
+        text: "Please configure API settings in plugin settings first.",
+      });
+      
+      const buttonContainer = errorContainer.createDiv({
+        cls: "sgr-error-message-actions",
+      });
+      
+      const button = buttonContainer.createEl("button", {
+        text: "Open Settings",
+        cls: "sgr-button sgr-button-primary",
+      });
+      
+      button.addEventListener("click", () => {
+        this.app.setting.open();
+        this.app.setting.openTabById(this.plugin.manifest.id);
+      });
+      
       return;
     }
 
