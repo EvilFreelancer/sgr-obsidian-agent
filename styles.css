@@ -444,7 +444,7 @@
 }
 
 .sgr-markdown p {
-  margin: 0.5em 0;
+  margin: 0.15em 0;
 }
 
 .sgr-markdown h1,
@@ -453,9 +453,19 @@
 .sgr-markdown h4,
 .sgr-markdown h5,
 .sgr-markdown h6 {
-  margin: 0.8em 0 0.4em 0;
+  margin: 0.3em 0 0.05em 0;
   font-weight: 600;
   line-height: 1.3;
+}
+
+/* Reduce top margin for elements immediately following headings */
+.sgr-markdown h1 + *,
+.sgr-markdown h2 + *,
+.sgr-markdown h3 + *,
+.sgr-markdown h4 + *,
+.sgr-markdown h5 + *,
+.sgr-markdown h6 + * {
+  margin-top: 0;
 }
 
 .sgr-markdown h1 {
@@ -478,16 +488,16 @@
 
 .sgr-markdown ul,
 .sgr-markdown ol {
-  margin: 0.5em 0;
+  margin: 0;
   padding-left: 1.5em;
 }
 
 .sgr-markdown li {
-  margin: 0.2em 0;
+  margin: 0.05em 0;
 }
 
 .sgr-markdown blockquote {
-  margin: 0.5em 0;
+  margin: 0.15em 0;
   padding-left: 1em;
   border-left: 3px solid var(--background-modifier-border);
   color: var(--text-muted);
@@ -506,7 +516,7 @@
   padding: 10px;
   border-radius: 4px;
   overflow-x: auto;
-  margin: 0.5em 0;
+  margin: 0.15em 0;
 }
 
 .sgr-markdown pre code {
@@ -528,9 +538,15 @@
 }
 
 .sgr-markdown table {
-  margin: 0.5em 0;
+  margin: 0.15em 0;
   border-collapse: collapse;
   width: 100%;
+}
+
+.sgr-markdown hr {
+  margin: 0.15em 0;
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
 }
 
 .sgr-markdown th,
