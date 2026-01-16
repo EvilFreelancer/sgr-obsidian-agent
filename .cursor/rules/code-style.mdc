@@ -51,6 +51,39 @@ interface AgentSettings {
 - Use descriptive names
 - Group related types together
 
+### Current Type Definitions
+```typescript
+// src/types/index.ts
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;  // Optional timestamp
+}
+
+export interface FileContext {
+  path: string;
+  content: string;
+  metadata?: {
+    title?: string;
+    tags?: string[];
+  };
+}
+
+export interface Model {
+  id: string;
+  name?: string;      // Optional display name
+  provider?: string;  // Optional provider info
+}
+
+export interface ChatHistoryMetadata {
+  title: string;
+  createdAt: string;        // ISO string
+  lastAccessedAt: string;   // ISO string
+  model: string;
+  mode: string;
+}
+```
+
 ## React Rules
 
 ### Component Structure
@@ -58,6 +91,14 @@ interface AgentSettings {
 - Use PascalCase for component names
 - One component per file
 - File name matches component name
+- Use `React.FC<PropsInterface>` for type safety
+
+### Current Component Structure
+- Components receive props via destructuring
+- Props interfaces defined above component
+- Optional props have default values
+- Components use hooks: `useState`, `useEffect`, `useRef`
+- Event handlers prefixed with `handle` (e.g., `handleSend`, `handleInputChange`)
 
 ### Hooks Usage
 - Use `useState` for local component state
@@ -159,8 +200,12 @@ class LLMAPIError extends Error {
 
 ### Settings
 - Use `loadData()` and `saveData()` for persistence
-- Validate settings before saving
-- Use atomic updates with `setSettings()`
+- Validate settings before saving using `validateSettings()` from `settings/model.ts`
+- Use `getDefaultSettings()` to merge with loaded settings
+- Settings interface: `AgentSettings` in `settings/model.ts`
+- Default values from `DEFAULT_SETTINGS` in `constants.ts`
+- Plugin instance stores settings in `this.settings`
+- Update methods: `updateLLMClient()`, `updateMessageRepository()` when settings change
 
 ## Code Organization
 
@@ -178,6 +223,36 @@ class LLMAPIError extends Error {
 - Store constants in `constants.ts`
 - Use descriptive names
 - Group related constants
+
+### Current Constants Structure
+```typescript
+// src/constants.ts
+export const VIEW_TYPE = "sgr-agent-chat-view";
+
+export const DEFAULT_SETTINGS = {
+  baseUrl: "",
+  apiKey: "",
+  proxy: "",
+  defaultModel: "",
+  temperature: 0.7,
+  maxTokens: 2000,
+  chatHistoryFolder: "Chat History",
+};
+
+export const CHAT_MODES = {
+  AGENT: "agent",
+  ASK: "ask",
+  PLAN: "plan",
+} as const;
+
+export type ChatMode = typeof CHAT_MODES[keyof typeof CHAT_MODES];
+
+export const SYSTEM_PROMPTS = {
+  [CHAT_MODES.AGENT]: "...",
+  [CHAT_MODES.ASK]: "...",
+  [CHAT_MODES.PLAN]: "...",
+};
+```
 
 ## Performance
 

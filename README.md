@@ -28,11 +28,35 @@ An AI assistant plugin for Obsidian that works with LLM through OpenAI-compatibl
    ```bash
    npm run build
    ```
-4. Copy the following files to your Obsidian vault's `.obsidian/plugins/sgr-obsidian-agent/` folder:
-   - `main.js`
-   - `manifest.json`
-   - `styles.css`
-5. Enable the plugin in Obsidian Settings → Community Plugins
+4. Copy all files from the `dist/sgr-obsidian-agent/` folder to your Obsidian vault's `.obsidian/plugins/sgr-obsidian-agent/` folder:
+   
+   **Finding your vault folder:**
+   - In Obsidian, go to Settings → Files & Links → "Vault location" to see your vault path
+   - The plugins folder is at: `<vault-path>/.obsidian/plugins/sgr-obsidian-agent/`
+   
+   **Copying files:**
+   ```bash
+   # On Linux/Mac:
+   mkdir -p /path/to/your/vault/.obsidian/plugins/sgr-obsidian-agent
+   cp -r dist/sgr-obsidian-agent/* /path/to/your/vault/.obsidian/plugins/sgr-obsidian-agent/
+   
+   # On Windows (PowerShell):
+   New-Item -ItemType Directory -Force -Path "C:\Path\To\Your\Vault\.obsidian\plugins\sgr-obsidian-agent"
+   Copy-Item -Path "dist\sgr-obsidian-agent\*" -Destination "C:\Path\To\Your\Vault\.obsidian\plugins\sgr-obsidian-agent\" -Recurse
+   
+   # Or manually:
+   # 1. Navigate to your vault folder
+   # 2. Open .obsidian/plugins/ folder (create if it doesn't exist)
+   # 3. Create sgr-obsidian-agent folder
+   # 4. Copy all files from dist/ folder into it
+   ```
+   
+   **Required files in `dist/sgr-obsidian-agent/`:**
+   - `main.js` - Compiled plugin code
+   - `manifest.json` - Plugin metadata
+   - `styles.css` - Plugin styles
+   
+5. Enable the plugin in Obsidian Settings → Community Plugins → Toggle "SGR Obsidian Agent" ON
 
 ### Development Installation
 
@@ -49,10 +73,12 @@ An AI assistant plugin for Obsidian that works with LLM through OpenAI-compatibl
    ```bash
    npm run dev
    ```
+   This will watch for changes and rebuild automatically. After each build, copy files from `dist/sgr-obsidian-agent/` to your Obsidian plugin folder.
 4. For production build:
    ```bash
    npm run build
    ```
+   This creates optimized files in the `dist/sgr-obsidian-agent/` folder. Copy all files from `dist/sgr-obsidian-agent/` to your Obsidian vault's `.obsidian/plugins/sgr-obsidian-agent/` folder.
 
 ## Configuration
 
@@ -167,6 +193,13 @@ npm run dev
 npm run build
 ```
 
+After building, all plugin files will be in the `dist/sgr-obsidian-agent/` folder:
+- `dist/sgr-obsidian-agent/main.js` - Compiled plugin code
+- `dist/sgr-obsidian-agent/manifest.json` - Plugin metadata
+- `dist/sgr-obsidian-agent/styles.css` - Plugin styles
+
+Copy these files to your Obsidian vault's `.obsidian/plugins/sgr-obsidian-agent/` folder to use the plugin.
+
 ### Code Style
 
 - All code comments in English
@@ -178,9 +211,11 @@ npm run build
 
 ### Plugin Not Loading
 
-- Check that `main.js`, `manifest.json`, and `styles.css` are in the correct folder
+- Check that `main.js`, `manifest.json`, and `styles.css` are in `.obsidian/plugins/sgr-obsidian-agent/` folder
+- Ensure you copied files from the `dist/sgr-obsidian-agent/` folder after building
 - Check Obsidian console for errors (Help → Toggle Developer Tools)
 - Ensure all dependencies are installed
+- Try reloading Obsidian (Ctrl+R or Cmd+R)
 
 ### API Connection Issues
 

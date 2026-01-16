@@ -49,7 +49,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: "dist/main.js",
+  outfile: "dist/sgr-obisidian-agent/main.js",
   define: {
     global: "window",
     "process.env.NODE_ENV": prod ? '"production"' : '"development"',
@@ -59,8 +59,8 @@ const context = await esbuild.context({
 });
 
 // Ensure dist directory exists
-if (!fs.existsSync("dist")) {
-  fs.mkdirSync("dist", { recursive: true });
+if (!fs.existsSync("dist/sgr-obisidian-agent/")) {
+  fs.mkdirSync("dist/sgr-obisidian-agent/", { recursive: true });
 }
 
 // Copy manifest.json and styles.css to dist
@@ -73,12 +73,12 @@ const copyFile = (src, dest) => {
 
 if (prod) {
   await context.rebuild();
-  copyFile("manifest.json", "dist/manifest.json");
-  copyFile("styles.css", "dist/styles.css");
+  copyFile("manifest.json", "dist/sgr-obisidian-agent/manifest.json");
+  copyFile("styles.css", "dist/sgr-obisidian-agent/styles.css");
   process.exit(0);
 } else {
   // Copy files on initial build
-  copyFile("manifest.json", "dist/manifest.json");
-  copyFile("styles.css", "dist/styles.css");
+  copyFile("manifest.json", "dist/sgr-obisidian-agent/manifest.json");
+  copyFile("styles.css", "dist/sgr-obisidian-agent/styles.css");
   await context.watch();
 }

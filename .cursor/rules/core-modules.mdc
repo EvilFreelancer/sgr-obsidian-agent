@@ -25,6 +25,10 @@ alwaysApply: true
 ### Interface
 ```typescript
 class LLMClient {
+  private baseUrl: string;
+  private apiKey: string;
+  private proxy?: string;
+  
   constructor(baseUrl: string, apiKey: string, proxy?: string);
   async fetchModels(): Promise<Model[]>;
   async sendMessage(
@@ -32,8 +36,16 @@ class LLMClient {
     messages: ChatMessage[],
     options?: ChatOptions
   ): Promise<AsyncIterable<string>>;
+  private async *parseSSEStream(body: ReadableStream<Uint8Array>): AsyncIterable<string>;
 }
 ```
+
+### Implementation Details
+- Base URL is normalized (trailing slash removed)
+- Proxy URL is used for both `/models` and `/chat/completions` endpoints if provided
+- SSE parsing handles partial chunks and buffers incomplete lines
+- Extracts content from `parsed.choices[0].delta.content`
+- Stops on `[DONE]` marker
 
 ### Error Handling
 - Network errors → `NetworkError`
@@ -44,18 +56,41 @@ class LLMClient {
 ## ChatManager Module
 
 ### Responsibilities
-- Manage chat session state
-- Handle three modes: Agent, Ask, Plan
-- Manage file context from @ mentions
+- Manage chat session state via `ChatSession` interface
+- Handle three modes: Agent, Ask, Plan (from `CHAT_MODES` constant)
+- Manage file context from @ mentions (reads files from Obsidian vault)
 - Coordinate between UI and LLM client
-- Build system prompts based on mode
+- Build system prompts based on mode (from `SYSTEM_PROMPTS` constant)
 
 ### Implementation Rules
-- Store messages in memory during session
-- Build system prompt based on selected mode
-- Include file context in system message
-- Handle streaming responses
-- Update UI state as messages arrive
+- Store messages in memory during session (`ChatSession.messages`)
+- System prompt added as first message with role 'system' on `startSession()`
+- File context added to user message content (not system message)
+- Format: `[File: path]\ncontent\n[/File]` for each file, then user question
+- Handle streaming responses via `appendAssistantMessage()` for incremental updates
+- Session state includes: messages, mode, model, fileContexts
+
+### ChatSession Interface
+```typescript
+interface ChatSession {
+  messages: ChatMessage[];
+  mode: ChatMode;
+  model: string;
+  fileContexts: FileContext[];
+}
+```
+
+### Methods
+- `startSession(mode: ChatMode, model: string)`: Initialize new session with system prompt
+- `addFileContext(filePath: string)`: Read file from vault and add to session
+- `removeFileContext(filePath: string)`: Remove file from context
+- `sendMessage(userMessage: string)`: Send message with file contexts, returns stream
+- `appendAssistantMessage(content: string)`: Append chunk to last assistant message or create new
+- `getCurrentSession()`: Get current session or null
+- `clearSession()`: Clear current session
+- `saveSession(title: string)`: Save session to MessageRepository
+- `loadSession(filePath: string)`: Load session from MessageRepository
+- `updateClient(baseUrl, apiKey, proxy?)`: Update LLM client configuration
 
 ### Modes
 - **Agent**: Autonomous agent with tools
@@ -63,6 +98,7 @@ class LLMClient {
 - **Plan**: Planning assistant with step-by-step execution
 
 ### System Prompts
+- Stored in `constants.ts` as `SYSTEM_PROMPTS` object
 - Agent: "You are an autonomous AI agent. You can use tools to accomplish tasks. Think step by step and decide which actions to take."
 - Ask: "You are a helpful assistant. Answer questions directly and concisely."
 - Plan: "You are a planning assistant. Break down tasks into steps and execute them systematically."
@@ -99,6 +135,14 @@ Message text
 ## Assistant
 Response text
 ```
+
+### Implementation Details
+- Frontmatter parsing uses regex: `/^---\n([\s\S]*?)\n---\n/`
+- Message parsing uses regex: `/^## (User|Assistant)\n/gm`
+- System messages are excluded from saved chats
+- Filenames sanitized: invalid chars replaced with `-`, max 100 chars
+- Folder created automatically if not exists via `ensureFolderExists()`
+- Chats sorted by `lastAccessedAt` descending (newest first)
 
 ## Settings Module
 

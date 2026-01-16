@@ -71,47 +71,96 @@ sgr-obsidian-agent/
 
 ### Core Module (`core/`)
 - **LLMClient**: Handles all communication with OpenAI-compatible API
-  - Supports streaming (SSE)
-  - Error handling for network and API errors
+  - Supports streaming (SSE) via `parseSSEStream()` method
+  - Error handling with custom error classes (NetworkError, LLMAPIError, InvalidModelError, RateLimitError)
   - Model fetching from `/models` endpoint
+  - Supports proxy URL for requests
+  - Returns `AsyncIterable<string>` for streaming responses
+  - Parses SSE format: `data: {...}` with `[DONE]` marker
 - **ChatManager**: Manages chat sessions and state
-  - Handles three modes: Agent, Ask, Plan
-  - Manages file context from @ mentions
+  - Handles three modes: Agent, Ask, Plan (from constants)
+  - Manages `ChatSession` with messages, mode, model, and fileContexts
+  - System prompts stored in `constants.ts` (SYSTEM_PROMPTS)
+  - File context added via `addFileContext(filePath: string)` - reads file from vault
+  - File context formatted as `[File: path]\ncontent\n[/File]` in user message
   - Coordinates between UI and LLM client
+  - Session management: `startSession()`, `clearSession()`, `saveSession()`, `loadSession()`
+  - Streaming handled via `appendAssistantMessage()` for incremental updates
 - **MessageRepository**: Persists chat history to markdown files
-  - Saves to `chatHistoryFolder` setting
-  - Frontmatter with metadata
-  - Markdown format for messages
+  - Saves to `chatHistoryFolder` setting (creates folder if not exists)
+  - Frontmatter with metadata (title, createdAt, lastAccessedAt, model, mode)
+  - Markdown format: `## User\n...\n\n## Assistant\n...`
+  - Methods: `saveChat()`, `loadChat()`, `listChats()`, `deleteChat()`
+  - Sorts chats by `lastAccessedAt` (newest first)
+  - Sanitizes filenames (removes invalid characters)
 
 ### Components Module (`components/`)
 - **AgentView**: Main sidebar view registered with Obsidian
   - View type: `"sgr-agent-chat-view"`
-  - Wraps React components in Obsidian view
+  - Extends `ItemView` from Obsidian
+  - Uses React root with `createRoot()` for rendering
+  - Handles plugin instance and ChatManager initialization
+  - Shows error message if ChatManager not initialized
 - **Chat**: Main chat container component
-  - Manages chat state
-  - Coordinates child components
+  - Manages chat state (mode, model, messages, streaming)
+  - Coordinates child components (ChatInput, ChatMessages, ChatControls, ModelSelector, ChatHistory)
+  - Handles message sending with file contexts
+  - Manages session lifecycle (start, save, load)
+  - Receives ChatManager, App, and settings as props
 - **ChatInput**: Input field with @ file mention support
-  - Autocomplete on `@` character
-  - File pills display
-  - Parses `@[[filename]]` or `@filename` format
+  - Uses `textarea` element (not Lexical editor)
+  - Autocomplete on `@` character with file search
+  - File pills display above input (with remove button)
+  - Formats file mentions as `@[[filename]]` in input text
+  - Keyboard navigation (ArrowUp/Down, Enter, Escape)
+  - Passes files as `FileContext[]` array to `onSend`
+  - Reads file content from vault when file selected
+  - Stores FileContext objects in component state
+  - Click-outside handler to close autocomplete
 - **ChatMessages**: Renders message history
-  - Markdown rendering for assistant messages
-  - Code highlighting
-  - Copy and edit functionality
+  - Filters out system messages
+  - Basic markdown rendering for assistant messages (code blocks, inline code, bold, italic, links)
+  - Shows streaming content in separate message
+  - Uses `dangerouslySetInnerHTML` for markdown (simple formatter)
+- **ChatControls**: Mode selector and action buttons
+  - Three mode buttons (Agent, Ask, Plan)
+  - Action buttons (New Chat, Save, History)
+  - Uses Button component from `ui/`
 - **ModelSelector**: Model selection dropdown
-  - Fetches models from API
-  - Caches model list
-  - Search functionality
+  - Fetches models from API using LLMClient
+  - Auto-selects first model if available
+  - Refresh button to reload models
+  - Shows error messages for API failures
+  - Uses Select component from `ui/`
+- **ChatHistory**: Chat history management (modal overlay)
+  - Modal overlay with click-outside-to-close
+  - Lists saved chats from MessageRepository (sorted by lastAccessedAt)
+  - Shows chat metadata (title, date, model, mode)
+  - Load and delete functionality
+  - Uses Button component from `ui/`
+  - Loading state while fetching chats
+- **ui/**: Reusable UI components
+  - `Button.tsx` - Button component extending `React.ButtonHTMLAttributes`
+    - Variants: `primary`, `secondary`, `ghost` (default: `primary`)
+    - Sizes: `sm`, `md`, `lg` (default: `md`)
+    - CSS classes: `sgr-button`, `sgr-button-{variant}`, `sgr-button-{size}`
+  - `Select.tsx` - Select dropdown component extending `React.SelectHTMLAttributes`
+    - Options: `Array<{ value: string; label: string }>`
+    - CSS class: `sgr-select`
 
 ### Settings Module (`settings/`)
 - **model.ts**: Settings interface and defaults
-  - `AgentSettings` interface
-  - Default values
-  - Validation rules
-- **SettingsTab.tsx**: Settings UI tab
-  - Form fields for all settings
-  - Validation
-  - Save/load integration
+  - `AgentSettings` interface matching all settings
+  - `getDefaultSettings()` function returns merged defaults
+  - `validateSettings()` function returns array of error strings
+  - Validates: required fields (baseUrl, apiKey), temperature range (0-2), maxTokens > 0
+- **SettingsTab.tsx**: Settings UI tab extending `PluginSettingTab`
+  - Uses Obsidian `Setting` class for form fields
+  - Fields: Base URL (text), API Key (password), Proxy URL (optional text), Default Model (text), Temperature (slider 0-2), Max Tokens (text), Chat History Folder (text)
+  - Auto-saves on change via `plugin.saveSettings()`
+  - Calls `plugin.updateLLMClient()` when API settings change
+  - Calls `plugin.updateMessageRepository()` when folder changes
+  - No explicit validation UI (relies on backend validation)
 
 ## Design Principles
 
@@ -124,18 +173,39 @@ sgr-obsidian-agent/
 
 ## Integration Points
 
-### Obsidian API
-- `registerView()` - Register custom sidebar view
-- `addRibbonIcon()` - Add ribbon icon for opening view
+### Plugin Entry Point (`main.ts`)
+- `SGRPlugin` class extends `Plugin`
+- `onload()`: Load settings, register view, add ribbon icon, initialize services
+- `onunload()`: Cleanup (currently empty)
+- `initializeServices()`: Create MessageRepository and ChatManager instances
+- `updateLLMClient()`: Recreate ChatManager when settings change
+- `updateMessageRepository()`: Recreate MessageRepository when folder changes
+- `getChatManager()`: Get current ChatManager instance (can be null)
+- `activateView()`: Open or reveal chat view
+
+### Obsidian API Usage
+- `registerView()` - Register custom sidebar view (in `main.ts` onload)
+- `addRibbonIcon()` - Add ribbon icon for opening view (icon: "message-square")
 - `addSettingTab()` - Add settings tab
-- `loadData()` / `saveData()` - Persist settings
+- `loadData()` / `saveData()` - Persist settings (async methods)
 - `vault.getMarkdownFiles()` - Get files for @ autocomplete
+- `vault.read(file)` - Read file content (async)
+- `vault.create(filePath, content)` - Create file (async)
+- `vault.modify(file, content)` - Modify existing file (async)
+- `vault.delete(file)` - Delete file (async)
+- `vault.createFolder(path)` - Create folder (async)
+- `vault.getAbstractFileByPath(path)` - Get file/folder by path
+- `ItemView` - Base class for custom views (AgentView extends it)
+- `createRoot()` from React - Create React root for rendering in Obsidian view
 
 ### LLM API
 - OpenAI-compatible format
-- `/models` endpoint for model list
-- `/chat/completions` endpoint for chat
-- SSE streaming support
+- `/models` endpoint for model list (GET request with Bearer token)
+- `/chat/completions` endpoint for chat (POST request with Bearer token)
+- SSE streaming support (Server-Sent Events)
+- Request format: `{ model, messages, temperature, max_tokens, stream: true }`
+- Response format: SSE stream with `data: {...}` lines, ends with `data: [DONE]`
+- Error codes: 401 (invalid key), 404 (model not found), 429 (rate limit)
 
 ## References
 
