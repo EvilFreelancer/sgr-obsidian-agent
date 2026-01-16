@@ -81,6 +81,10 @@ export class AgentView extends ItemView {
           this.plugin.settings.defaultMode = mode;
           await this.plugin.saveSettings();
         }}
+        onOpenSettings={() => {
+          (this.app as any).setting.open();
+          (this.app as any).setting.openTabById(this.plugin.manifest.id);
+        }}
       />
     );
   }

@@ -16,6 +16,7 @@ interface ChatProps {
   defaultModel: string;
   defaultMode: ChatMode;
   onModeChange: (mode: ChatMode) => Promise<void>;
+  onOpenSettings: () => void;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -27,6 +28,7 @@ export const Chat: React.FC<ChatProps> = ({
   defaultModel,
   defaultMode,
   onModeChange: onModeChangeSettings,
+  onOpenSettings,
 }) => {
   const [mode, setMode] = useState<ChatMode>(defaultMode);
   const [model, setModel] = useState<string>(defaultModel);
@@ -191,6 +193,38 @@ export const Chat: React.FC<ChatProps> = ({
 
   return (
     <div className="sgr-chat">
+      <div className="sgr-chat-top-bar">
+        <button
+          className="sgr-top-bar-button sgr-new-chat-button"
+          onClick={handleNewChat}
+          title="New Chat"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+        <div className="sgr-top-bar-right">
+          <button
+            className="sgr-top-bar-button sgr-history-button"
+            onClick={() => setShowHistory(true)}
+            title="History"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 2C4.69 2 2 4.69 2 8s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10.5c-2.48 0-4.5-2.02-4.5-4.5S5.52 3.5 8 3.5 12.5 5.52 12.5 8 10.48 12.5 8 12.5z" />
+              <path d="M8.5 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+            </svg>
+          </button>
+          <button
+            className="sgr-top-bar-button sgr-settings-button"
+            onClick={onOpenSettings}
+            title="Settings"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 0a1 1 0 00-1 1v1.5a5.5 5.5 0 00-4.5 4.5H1a1 1 0 000 2h1.5a5.5 5.5 0 004.5 4.5V15a1 1 0 002 0v-1.5a5.5 5.5 0 004.5-4.5H15a1 1 0 000-2h-1.5A5.5 5.5 0 009 2.5V1a1 1 0 00-1-1zM6.5 4a3.5 3.5 0 103 0 3.5 3.5 0 00-3 0z" />
+            </svg>
+          </button>
+        </div>
+      </div>
       <div className="sgr-chat-messages-container">
         <ChatMessages
           messages={messages}
@@ -211,9 +245,7 @@ export const Chat: React.FC<ChatProps> = ({
         proxy={proxy}
         selectedModel={model}
         onModelChange={handleModelChange}
-        onNewChat={handleNewChat}
         onSaveChat={handleSaveChat}
-        onLoadHistory={() => setShowHistory(true)}
       />
       {showHistory && (
         <div className="sgr-chat-history-overlay" onClick={() => setShowHistory(false)}>

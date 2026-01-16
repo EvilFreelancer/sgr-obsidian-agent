@@ -20,9 +20,7 @@ interface ChatInputProps {
   proxy?: string;
   selectedModel: string;
   onModelChange: (model: string) => void;
-  onNewChat: () => void;
   onSaveChat: () => void;
-  onLoadHistory: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -39,9 +37,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   proxy,
   selectedModel,
   onModelChange,
-  onNewChat,
   onSaveChat,
-  onLoadHistory,
 }) => {
   const [input, setInput] = useState("");
   const [fileContexts, setFileContexts] = useState<FileContext[]>([]);
@@ -257,12 +253,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const modeIcons = {
     [CHAT_MODES.AGENT]: (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm0 2.5c-1.38 0-2.5 1.12-2.5 2.5S5.62 9.5 7 9.5 9.5 8.38 9.5 7 8.38 4.5 7 4.5z" />
+        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm-2 2.5c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5h-3c-.28 0-.5-.22-.5-.5zm0 2c0-.28.22-.5.5-.5h4c.28 0 .5.22.5.5s-.22.5-.5.5h-4c-.28 0-.5-.22-.5-.5zm-1-1c0-.28.22-.5.5-.5h6c.28 0 .5.22.5.5s-.22.5-.5.5h-6c-.28 0-.5-.22-.5-.5z" />
       </svg>
     ),
     [CHAT_MODES.ASK]: (
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm.5 11h-1v-1h1v1zm0-2.5h-1V5.5h1V8.5z" />
+        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm-1.5 2.5c0-.28.22-.5.5-.5h2c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5zm0 2c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5h-3c-.28 0-.5-.22-.5-.5zm-1-1c0-.28.22-.5.5-.5h5c.28 0 .5.22.5.5s-.22.5-.5.5h-5c-.28 0-.5-.22-.5-.5z" />
       </svg>
     ),
     [CHAT_MODES.PLAN]: (
@@ -312,32 +308,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         rows={5}
       />
       <div className="sgr-chat-input-bottom">
-        <div className="sgr-chat-input-actions">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onNewChat}
-            className="sgr-chat-action-button"
-          >
-            New Chat
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onSaveChat}
-            className="sgr-chat-action-button"
-          >
-            Save
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLoadHistory}
-            className="sgr-chat-action-button"
-          >
-            History
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onSaveChat}
+          className="sgr-chat-action-button"
+        >
+          Save
+        </Button>
         <div className="sgr-chat-input-selectors">
           <CustomSelect
             options={modeOptions}
