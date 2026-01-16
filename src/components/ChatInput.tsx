@@ -20,7 +20,6 @@ interface ChatInputProps {
   proxy?: string;
   selectedModel: string;
   onModelChange: (model: string) => void;
-  onSaveChat: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -37,7 +36,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   proxy,
   selectedModel,
   onModelChange,
-  onSaveChat,
 }) => {
   const [input, setInput] = useState("");
   const [fileContexts, setFileContexts] = useState<FileContext[]>([]);
@@ -251,21 +249,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   // Icons for modes
   const modeIcons = {
-    [CHAT_MODES.AGENT]: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm-2 2.5c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5h-3c-.28 0-.5-.22-.5-.5zm0 2c0-.28.22-.5.5-.5h4c.28 0 .5.22.5.5s-.22.5-.5.5h-4c-.28 0-.5-.22-.5-.5zm-1-1c0-.28.22-.5.5-.5h6c.28 0 .5.22.5.5s-.22.5-.5.5h-6c-.28 0-.5-.22-.5-.5z" />
-      </svg>
-    ),
-    [CHAT_MODES.ASK]: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm-1.5 2.5c0-.28.22-.5.5-.5h2c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5zm0 2c0-.28.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5h-3c-.28 0-.5-.22-.5-.5zm-1-1c0-.28.22-.5.5-.5h5c.28 0 .5.22.5.5s-.22.5-.5.5h-5c-.28 0-.5-.22-.5-.5z" />
-      </svg>
-    ),
-    [CHAT_MODES.PLAN]: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-        <path d="M1 2h12v1H1V2zm0 3h12v1H1V5zm0 3h8v1H1V8zm0 3h8v1H1v-1z" />
-      </svg>
-    ),
+    [CHAT_MODES.AGENT]: "🤖",
+    [CHAT_MODES.ASK]: "💬",
+    [CHAT_MODES.PLAN]: "📋",
   };
 
   const modeOptions = [
@@ -308,14 +294,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         rows={5}
       />
       <div className="sgr-chat-input-bottom">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onSaveChat}
-          className="sgr-chat-action-button"
-        >
-          Save
-        </Button>
         <div className="sgr-chat-input-selectors">
           <CustomSelect
             options={modeOptions}
@@ -330,24 +308,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={modelsLoading || modelOptions.length === 0}
             className="sgr-model-select"
           />
-          <Button
-            onClick={isLoading ? (onStop || (() => {})) : handleSend}
-            disabled={isLoading ? false : (disabled || !input.trim())}
-            variant="primary"
-            className="sgr-play-stop-button sgr-play-button-round"
-          >
-            {isLoading ? (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <rect x="4" y="2" width="2" height="12" />
-                <rect x="10" y="2" width="2" height="12" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M3 2v12l10-6z" />
-              </svg>
-            )}
-          </Button>
         </div>
+        <Button
+          onClick={isLoading ? (onStop || (() => {})) : handleSend}
+          disabled={isLoading ? false : (disabled || !input.trim())}
+          variant="primary"
+          className="sgr-play-stop-button sgr-play-button-round"
+        >
+          {isLoading ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="4" y="2" width="2" height="12" />
+              <rect x="10" y="2" width="2" height="12" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3 2v12l10-6z" />
+            </svg>
+          )}
+        </Button>
       </div>
       {showAutocomplete && autocompleteFiles.length > 0 && (
         <div ref={autocompleteRef} className="sgr-autocomplete">

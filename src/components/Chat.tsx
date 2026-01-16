@@ -245,7 +245,6 @@ export const Chat: React.FC<ChatProps> = ({
         proxy={proxy}
         selectedModel={model}
         onModelChange={handleModelChange}
-        onSaveChat={handleSaveChat}
       />
       {showHistory && (
         <div className="sgr-chat-history-overlay" onClick={() => setShowHistory(false)}>

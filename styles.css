@@ -358,6 +358,13 @@
   margin-top: 8px;
 }
 
+.sgr-chat-input-selectors {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
 .sgr-chat-input-actions {
   display: flex;
   gap: 4px;
@@ -372,6 +379,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 1;
 }
 
 .sgr-file-pills {
@@ -641,8 +649,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  width: 14px;
-  height: 14px;
+  font-size: 14px;
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -677,6 +685,16 @@
   overflow-y: auto;
 }
 
+.sgr-model-select {
+  flex: 1;
+  min-width: 120px;
+}
+
+.sgr-model-select .sgr-custom-select-dropdown {
+  width: 100%;
+  min-width: 200px;
+}
+
 .sgr-custom-select-option {
   display: flex;
   align-items: center;
@@ -706,7 +724,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  width: 14px;
-  height: 14px;
+  font-size: 14px;
+  line-height: 1;
   flex-shrink: 0;
 }
