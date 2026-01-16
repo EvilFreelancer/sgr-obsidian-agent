@@ -1,0 +1,183 @@
+---
+description: Workflow rules for development, bug fixes, and new features
+globs: src/**/*.ts, src/**/*.tsx, tests/**/*.ts
+alwaysApply: true
+---
+
+# Workflow Rules
+
+## General Development Process
+
+### Understanding Requirements
+1. Read and understand SPECIFICATION.md
+2. Identify which module/component needs to be implemented
+3. Check architecture rules for layer placement
+4. Review existing code for patterns
+
+### Implementation Approach
+- Follow "one class at a time" principle
+- Start from lower architecture layers
+- Write minimal code that works
+- Test incrementally
+
+## New Features (TDD Approach)
+
+### Mandatory Workflow for New Features
+
+**CRITICALLY IMPORTANT**: When user asks to implement a new feature (using words "фича", "feature", "новая функция", "добавить", "implement", "add"), **always** follow this workflow:
+
+**Do not skip any step!** Always follow order: understand → implement → test → verify → report.
+
+### Step-by-step Process for New Features
+
+1. **Understand requirements**
+   - Read SPECIFICATION.md relevant section
+   - Identify architecture layer
+   - Check dependencies
+   - Plan implementation approach
+
+2. **Implement feature**
+   - Follow rules from @code-style.mdc and @architecture.mdc
+   - Use @implementation-order.mdc if adding new classes
+   - Write minimal code that works
+   - Add TypeScript types
+
+3. **Test manually**
+   - Test in Obsidian environment
+   - Verify feature works as expected
+   - Check error handling
+   - Test edge cases
+
+4. **Verify integration**
+   - Check integration with other modules
+   - Verify no breaking changes
+   - Test with different settings
+
+5. **Write report**
+   - Brief report of work done
+   - What feature was implemented
+   - Which files were created/modified
+   - How to test the feature
+
+### Report Structure Example for New Features
+
+```markdown
+## Feature: [brief description]
+
+### Implementation
+1. Created `ChatInput.tsx` component with @ file mention support
+2. Added `FileContext` interface in `types/index.ts`
+3. Integrated with `ChatManager` for file context handling
+4. Tested in Obsidian - autocomplete works correctly
+
+### Changed Files
+- `src/components/ChatInput.tsx` - new component
+- `src/types/index.ts` - added FileContext interface
+- `src/core/ChatManager.ts` - added file context handling
+```
+
+## Bug Fixes
+
+### Mandatory Workflow for Bug Fixes
+
+**CRITICALLY IMPORTANT**: When user asks to fix a bug (using words "баг", "bug", "ошибка", "error", "исправить", "fix"), **always** follow this workflow:
+
+1. **Reproduce bug**
+   - Understand what the bug is
+   - Reproduce in Obsidian environment
+   - Identify root cause
+   - Check related code
+
+2. **Fix code**
+   - Write code that fixes bug
+   - Follow rules from @code-style.mdc and @architecture.mdc
+   - Keep fix minimal and focused
+
+3. **Verify fix**
+   - Test in Obsidian environment
+   - Verify bug is fixed
+   - Check no regressions
+   - Test related functionality
+
+4. **Write report**
+   - Brief report of work done
+   - What was fixed
+   - Root cause (if identified)
+   - How to verify fix
+
+### Report Structure Example for Bug Fixes
+
+```markdown
+## Bug Fix: [brief description]
+
+### Problem
+[Bug description and reproduction steps]
+
+### Solution
+1. Fixed `LLMClient.ts` - added proper error handling for network timeouts
+2. Updated `Chat.tsx` - show error message to user
+3. Tested in Obsidian - errors now display correctly
+
+### Changed Files
+- `src/core/LLMClient.ts` - added timeout handling
+- `src/components/Chat.tsx` - added error display
+```
+
+## Implementation Order
+
+### When Adding New Components
+
+Follow architecture layers from @architecture.mdc:
+
+1. **Layer 1**: Core services (LLMClient, MessageRepository)
+2. **Layer 2**: Business logic (ChatManager)
+3. **Layer 3**: React components
+4. **Layer 4**: Integration (main.ts, AgentView)
+
+### When Adding New Features to Existing Components
+
+1. Check if feature belongs to existing component
+2. If new component needed, follow implementation order
+3. Update types/interfaces first
+4. Implement component
+5. Integrate with parent components
+
+## Code Review Checklist
+
+Before considering work complete:
+
+- [ ] Code follows @code-style.mdc rules
+- [ ] Architecture boundaries respected (@architecture.mdc)
+- [ ] TypeScript types are correct
+- [ ] Error handling is in place
+- [ ] Tested in Obsidian environment
+- [ ] No console errors
+- [ ] Comments are in English
+- [ ] Empty line at end of files
+
+## Obsidian-Specific Testing
+
+### Manual Testing Steps
+
+1. **Build plugin**: `npm run build`
+2. **Load in Obsidian**: Enable plugin in settings
+3. **Test functionality**: Use feature as user would
+4. **Check console**: Look for errors in Obsidian console
+5. **Test settings**: Verify settings save/load correctly
+6. **Test view**: Open sidebar view, test interactions
+
+### Common Issues to Check
+
+- View registration works
+- Settings persist correctly
+- File operations work (reading vault files)
+- React components render correctly
+- API calls work (check network tab)
+- Error messages display to user
+
+## References
+
+@SPECIFICATION.md
+@architecture.mdc
+@code-style.mdc
+@implementation-order.mdc

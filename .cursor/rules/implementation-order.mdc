@@ -1,0 +1,145 @@
+---
+description: Implementation order for new features - one module at a time
+globs: src/**/*.ts, src/**/*.tsx
+alwaysApply: false
+---
+
+# Implementation Order: One Module at a Time
+
+## "One Module at a Time" Principle
+
+When adding new functionality, follow **"one module at a time"** principle, starting from lower architecture layers.
+
+## Architecture Layers (from bottom to top)
+
+1. **Layer 1**: Core Services (LLMClient, MessageRepository, Settings)
+2. **Layer 2**: Business Logic (ChatManager, Utils)
+3. **Layer 3**: React Components (Chat, ChatInput, ChatMessages, etc.)
+4. **Layer 4**: Integration (main.ts, AgentView, SettingsTab)
+
+## Implementation Steps
+
+### 1. Determine Layer
+Determine which layer the new functionality belongs to (see @architecture.mdc)
+
+### 2. Check Dependencies
+- List all dependencies needed
+- Ensure lower layer dependencies exist
+- Create stubs/interfaces if needed
+
+### 3. Implement Module
+- Create module with minimal implementation
+- Use TypeScript types
+- Add JSDoc comments in English
+- Follow rules from @code-style.mdc
+
+### 4. Test Module
+- Test module in isolation
+- Test in Obsidian environment if applicable
+- Verify error handling
+- Check edge cases
+
+### 5. Move to Next Layer
+Only after lower layer module is ready and tested, move to upper layer modules.
+
+## Example: Adding File Context Feature
+
+### Step 1: Layer 1 - Types
+```typescript
+// src/types/index.ts
+export interface FileContext {
+  path: string;
+  content: string;
+  metadata?: {
+    title?: string;
+    tags?: string[];
+  };
+}
+```
+
+### Step 2: Layer 2 - ChatManager Enhancement
+```typescript
+// src/core/ChatManager.ts
+class ChatManager {
+  private fileContexts: FileContext[] = [];
+  
+  addFileContext(file: FileContext): void {
+    this.fileContexts.push(file);
+  }
+  
+  buildSystemPrompt(mode: ChatMode): string {
+    // Include file contexts in system prompt
+  }
+}
+```
+
+### Step 3: Layer 3 - ChatInput Component
+```typescript
+// src/components/ChatInput.tsx
+export const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
+  const [files, setFiles] = useState<FileContext[]>([]);
+  
+  const handleFileSelect = (file: FileContext) => {
+    setFiles([...files, file]);
+  };
+  
+  // Autocomplete on @ character
+};
+```
+
+### Step 4: Layer 4 - Integration
+```typescript
+// src/components/Chat.tsx
+const handleSend = (message: string, files: FileContext[]) => {
+  files.forEach(file => chatManager.addFileContext(file));
+  chatManager.sendMessage(message);
+};
+```
+
+## Forbidden
+
+❌ Implement multiple modules simultaneously
+❌ Move to upper layers before lower ones are ready
+❌ Skip type definitions
+❌ Implement functionality without understanding architecture
+❌ Create circular dependencies
+
+## Allowed
+
+✅ Implement one module at a time
+✅ Create type definitions first
+✅ Use stubs/interfaces for dependencies
+✅ Test incrementally
+✅ Refactor after basic functionality works
+
+## Dependency Rules
+
+### Allowed Dependencies
+- Layer 1 → `types/`, `utils/`, Obsidian API
+- Layer 2 → Layer 1, `types/`, `utils/`
+- Layer 3 → Layer 1, Layer 2, `types/`, React
+- Layer 4 → All layers, Obsidian API
+
+### Forbidden Dependencies
+- Layer 1 → Layer 2, 3, 4
+- Layer 2 → Layer 3, 4
+- Layer 3 → Layer 4 (except AgentView)
+- Any circular dependencies
+
+## Component Implementation Order
+
+When implementing React components:
+
+1. **Types/Interfaces**: Define props and state types
+2. **Component Structure**: Create component skeleton
+3. **State Management**: Add useState hooks
+4. **Event Handlers**: Implement handlers
+5. **Rendering**: Implement JSX
+6. **Styling**: Add CSS classes
+7. **Integration**: Connect to parent components
+
+## References
+
+@architecture.mdc
+@code-style.mdc
+@core-modules.mdc

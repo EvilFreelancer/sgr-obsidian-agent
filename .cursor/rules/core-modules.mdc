@@ -1,0 +1,163 @@
+---
+description: Rules for core modules of SGR Obsidian Agent
+globs: src/core/**/*.ts, src/settings/**/*.ts
+alwaysApply: true
+---
+
+# Rules for Core Modules
+
+## LLMClient Module
+
+### Responsibilities
+- Communication with OpenAI-compatible API
+- Model fetching from `/models` endpoint
+- Chat completion requests
+- Streaming support (SSE)
+- Error handling for API errors
+
+### Implementation Rules
+- Use `fetch` API for HTTP requests
+- Support both streaming and non-streaming modes
+- Handle authentication with Bearer token
+- Parse SSE streams correctly
+- Return structured error types
+
+### Interface
+```typescript
+class LLMClient {
+  constructor(baseUrl: string, apiKey: string, proxy?: string);
+  async fetchModels(): Promise<Model[]>;
+  async sendMessage(
+    model: string,
+    messages: ChatMessage[],
+    options?: ChatOptions
+  ): Promise<AsyncIterable<string>>;
+}
+```
+
+### Error Handling
+- Network errors → `NetworkError`
+- API errors (4xx, 5xx) → `LLMAPIError` with status code
+- Invalid model → `InvalidModelError`
+- Rate limits → `RateLimitError`
+
+## ChatManager Module
+
+### Responsibilities
+- Manage chat session state
+- Handle three modes: Agent, Ask, Plan
+- Manage file context from @ mentions
+- Coordinate between UI and LLM client
+- Build system prompts based on mode
+
+### Implementation Rules
+- Store messages in memory during session
+- Build system prompt based on selected mode
+- Include file context in system message
+- Handle streaming responses
+- Update UI state as messages arrive
+
+### Modes
+- **Agent**: Autonomous agent with tools
+- **Ask**: Simple Q&A assistant
+- **Plan**: Planning assistant with step-by-step execution
+
+### System Prompts
+- Agent: "You are an autonomous AI agent. You can use tools to accomplish tasks. Think step by step and decide which actions to take."
+- Ask: "You are a helpful assistant. Answer questions directly and concisely."
+- Plan: "You are a planning assistant. Break down tasks into steps and execute them systematically."
+
+## MessageRepository Module
+
+### Responsibilities
+- Save chat history to markdown files
+- Load chat history from files
+- Manage chat metadata (title, dates, model, mode)
+- List all saved chats
+- Delete chat files
+
+### Implementation Rules
+- Save to `chatHistoryFolder` setting
+- Use frontmatter for metadata
+- Markdown format for messages
+- Handle file operations with Obsidian API
+- Validate file paths
+
+### File Format
+```yaml
+---
+title: "Chat Title"
+createdAt: "2024-01-01T12:00:00Z"
+lastAccessedAt: "2024-01-01T12:00:00Z"
+model: "gpt-4"
+mode: "agent"
+---
+
+## User
+Message text
+
+## Assistant
+Response text
+```
+
+## Settings Module
+
+### Responsibilities
+- Define settings interface
+- Provide default values
+- Validate settings
+- Handle settings persistence
+
+### Implementation Rules
+- Use `AgentSettings` interface
+- Validate required fields (baseUrl, apiKey)
+- Validate ranges (temperature: 0-2)
+- Provide sensible defaults
+- Handle missing settings gracefully
+
+### Settings Interface
+```typescript
+interface AgentSettings {
+  baseUrl: string;
+  apiKey: string;
+  proxy?: string;
+  defaultModel: string;
+  temperature: number;
+  maxTokens: number;
+  chatHistoryFolder: string;
+}
+```
+
+## General Rules for All Core Modules
+
+1. **Type safety**: Use TypeScript types everywhere
+2. **Error handling**: Use specific error types, not generic Error
+3. **Async/await**: Use async/await for all async operations
+4. **Documentation**: Document public methods with JSDoc comments (in English)
+5. **Immutability**: Don't mutate input parameters
+6. **Single responsibility**: Each module has one clear purpose
+
+## Dependencies
+
+### LLMClient
+- No dependencies on other core modules
+- Can depend on `types/` and `utils/`
+
+### ChatManager
+- Depends on `LLMClient`
+- Depends on `MessageRepository` (optional, for auto-save)
+- Can depend on `types/` and `utils/`
+
+### MessageRepository
+- Depends on Obsidian API (`app.vault`)
+- Can depend on `types/` and `utils/`
+
+### Settings
+- No dependencies on other core modules
+- Can depend on `types/`
+
+## References
+
+@SPECIFICATION.md
+@architecture.mdc
+@code-style.mdc

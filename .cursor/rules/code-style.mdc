@@ -1,0 +1,199 @@
+---
+description: Code style and formatting rules for TypeScript/React
+globs: *.ts, *.tsx, **/*.ts, **/*.tsx
+alwaysApply: true
+---
+
+# Code Style Rules
+
+## General Rules
+
+1. **Comments**: Write all code comments **ONLY in English**
+2. **User responses**: Respond in Russian unless user requests otherwise
+3. **Empty line at end of file**: Always add an empty line at the end of new files
+4. **No emojis**: Do not use emojis in code
+
+## TypeScript Rules
+
+### Type Hints
+- **Mandatory**: Use type hints for all functions, methods, and variables
+- Use explicit types instead of `any` when possible
+- Use `interface` for object shapes
+- Use `type` for unions, intersections, and aliases
+- Use `Optional<T>` or `T | undefined` for optional values
+
+### Interfaces
+- Define interfaces for all data structures
+- Use PascalCase for interface names
+- Export interfaces that are used across modules
+
+Example:
+```typescript
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+}
+
+interface AgentSettings {
+  baseUrl: string;
+  apiKey: string;
+  proxy?: string;
+  defaultModel: string;
+  temperature: number;
+  maxTokens: number;
+  chatHistoryFolder: string;
+}
+```
+
+### Type Definitions
+- Store shared types in `src/types/` directory
+- Use descriptive names
+- Group related types together
+
+## React Rules
+
+### Component Structure
+- Use functional components with hooks
+- Use PascalCase for component names
+- One component per file
+- File name matches component name
+
+### Hooks Usage
+- Use `useState` for local component state
+- Use `useEffect` for side effects
+- Use `useContext` for global state (if needed)
+- Follow React hooks rules
+
+### Props
+- Define props interface for each component
+- Use destructuring for props
+- Mark optional props with `?`
+
+Example:
+```typescript
+interface ChatInputProps {
+  onSend: (message: string, files: FileContext[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+export const ChatInput: React.FC<ChatInputProps> = ({
+  onSend,
+  disabled = false,
+  placeholder = "Type a message..."
+}) => {
+  // Component implementation
+};
+```
+
+### Event Handlers
+- Use descriptive names: `handleSend`, `handleFileSelect`
+- Pass event handlers as props, not inline functions when possible
+- Use `useCallback` for handlers passed to child components
+
+## File Structure
+
+### Element Order in File
+1. Imports (grouped: React → Obsidian → third-party → local)
+2. Type definitions and interfaces
+3. Constants
+4. Component/class definition
+5. Exports
+
+### Imports
+- Group imports: React → Obsidian API → third-party → local
+- Use absolute imports for local modules when possible
+- One import per line for clarity
+
+Example:
+```typescript
+import React, { useState, useEffect } from 'react';
+import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { ChatManager } from '../core/ChatManager';
+import { ChatMessage } from '../types';
+```
+
+## Naming Conventions
+
+- **Components**: PascalCase (`ChatInput`, `ModelSelector`)
+- **Functions and methods**: camelCase (`handleSend`, `fetchModels`)
+- **Constants**: UPPER_SNAKE_CASE (`VIEW_TYPE`, `DEFAULT_TEMPERATURE`)
+- **Private methods**: start with `_` (`_internalMethod`)
+- **Interfaces and types**: PascalCase (`ChatMessage`, `AgentSettings`)
+- **Files**: PascalCase for components (`ChatInput.tsx`), camelCase for utilities (`chatManager.ts`)
+
+## Error Handling
+
+- Use specific error types, not generic `Error`
+- Create custom error classes for business logic
+- Always include informative error messages
+- Handle async errors with try/catch
+- Show user-friendly error messages in UI
+
+Example:
+```typescript
+class LLMAPIError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public apiError?: any
+  ) {
+    super(message);
+    this.name = 'LLMAPIError';
+  }
+}
+```
+
+## Obsidian API Usage
+
+### Plugin Instance
+- Access plugin instance through props or context
+- Use `this.app`, `this.settings` from plugin instance
+- Use `this.app.vault` for file operations
+
+### View Registration
+- Use `registerView()` in `onload()`
+- View type constant: `"sgr-agent-chat-view"`
+- Use `activateView()` to open view
+
+### Settings
+- Use `loadData()` and `saveData()` for persistence
+- Validate settings before saving
+- Use atomic updates with `setSettings()`
+
+## Code Organization
+
+### Component Files
+- Keep components focused and small
+- Extract reusable logic into hooks
+- Separate UI components from business logic
+
+### Utility Functions
+- Place pure functions in `utils/`
+- Keep functions focused on single responsibility
+- Export functions that are used in multiple places
+
+### Constants
+- Store constants in `constants.ts`
+- Use descriptive names
+- Group related constants
+
+## Performance
+
+- Use `React.memo()` for expensive components
+- Use `useCallback()` and `useMemo()` appropriately
+- Avoid unnecessary re-renders
+- Lazy load heavy components if needed
+
+## Testing
+
+- Write unit tests for utility functions
+- Test React components with React Testing Library (if available)
+- Test error handling paths
+- Mock Obsidian API in tests
+
+## References
+
+@SPECIFICATION.md
+@architecture.mdc

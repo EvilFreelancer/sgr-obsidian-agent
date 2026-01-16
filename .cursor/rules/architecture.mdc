@@ -1,0 +1,143 @@
+---
+description: Architectural rules and boundaries for SGR Obsidian Agent plugin
+globs: src/**/*.ts, src/**/*.tsx
+alwaysApply: true
+---
+
+# Architectural Rules
+
+## General Architecture
+
+The **SGR Obsidian Agent** plugin uses **modular architecture with clear separation of concerns**. The plugin is an AI assistant for Obsidian that works with LLM through OpenAI-compatible API in agent format.
+
+## Project Structure
+
+```
+sgr-obsidian-agent/
+├── manifest.json          # Plugin metadata
+├── package.json           # Dependencies and scripts
+├── tsconfig.json          # TypeScript configuration
+├── esbuild.config.mjs     # Build configuration
+├── src/
+│   ├── main.ts            # Plugin entry point
+│   ├── constants.ts       # Constants and types
+│   ├── components/        # React components
+│   │   ├── AgentView.tsx  # Main sidebar view
+│   │   ├── Chat.tsx       # Chat component
+│   │   ├── ChatInput.tsx  # Message input field
+│   │   ├── ChatMessages.tsx # Message display
+│   │   ├── ChatControls.tsx # Chat controls
+│   │   ├── ModelSelector.tsx # Model selector
+│   │   ├── ChatHistory.tsx # Chat history
+│   │   └── ui/            # UI components (buttons, selectors, etc.)
+│   ├── settings/          # Plugin settings
+│   │   ├── model.ts       # Settings model
+│   │   └── SettingsTab.tsx # Settings tab
+│   ├── core/              # Core logic
+│   │   ├── ChatManager.ts # Chat management
+│   │   ├── MessageRepository.ts # Message repository
+│   │   └── LLMClient.ts   # LLM API client
+│   ├── utils/             # Utilities
+│   └── types/             # TypeScript types
+└── styles.css             # Plugin styles
+```
+
+## Architecture Layers
+
+### Layer 1: Core Services (No Dependencies)
+- `LLMClient.ts` - Client for OpenAI-compatible API
+- `MessageRepository.ts` - Message storage and retrieval
+- `settings/model.ts` - Settings data model
+
+### Layer 2: Business Logic
+- `ChatManager.ts` - Chat session management
+- `utils/` - Utility functions
+
+### Layer 3: React Components
+- `components/Chat.tsx` - Main chat component
+- `components/ChatInput.tsx` - Input with @ file mentions
+- `components/ChatMessages.tsx` - Message rendering
+- `components/ChatControls.tsx` - Chat controls
+- `components/ModelSelector.tsx` - Model selection
+- `components/ChatHistory.tsx` - Chat history management
+- `components/ui/` - Reusable UI components
+
+### Layer 4: Integration Layer
+- `main.ts` - Plugin entry point, Obsidian API integration
+- `components/AgentView.tsx` - Obsidian view wrapper
+- `settings/SettingsTab.tsx` - Settings UI
+
+## Module Rules
+
+### Core Module (`core/`)
+- **LLMClient**: Handles all communication with OpenAI-compatible API
+  - Supports streaming (SSE)
+  - Error handling for network and API errors
+  - Model fetching from `/models` endpoint
+- **ChatManager**: Manages chat sessions and state
+  - Handles three modes: Agent, Ask, Plan
+  - Manages file context from @ mentions
+  - Coordinates between UI and LLM client
+- **MessageRepository**: Persists chat history to markdown files
+  - Saves to `chatHistoryFolder` setting
+  - Frontmatter with metadata
+  - Markdown format for messages
+
+### Components Module (`components/`)
+- **AgentView**: Main sidebar view registered with Obsidian
+  - View type: `"sgr-agent-chat-view"`
+  - Wraps React components in Obsidian view
+- **Chat**: Main chat container component
+  - Manages chat state
+  - Coordinates child components
+- **ChatInput**: Input field with @ file mention support
+  - Autocomplete on `@` character
+  - File pills display
+  - Parses `@[[filename]]` or `@filename` format
+- **ChatMessages**: Renders message history
+  - Markdown rendering for assistant messages
+  - Code highlighting
+  - Copy and edit functionality
+- **ModelSelector**: Model selection dropdown
+  - Fetches models from API
+  - Caches model list
+  - Search functionality
+
+### Settings Module (`settings/`)
+- **model.ts**: Settings interface and defaults
+  - `AgentSettings` interface
+  - Default values
+  - Validation rules
+- **SettingsTab.tsx**: Settings UI tab
+  - Form fields for all settings
+  - Validation
+  - Save/load integration
+
+## Design Principles
+
+1. **One class at a time**: When implementing new functionality, create one class/module at a time, starting from lower layers
+2. **Minimal dependencies**: Each module should depend only on lower layer modules
+3. **React hooks**: Use `useState`, `useEffect`, `useContext` appropriately
+4. **Obsidian API**: Use Obsidian's `loadData()`, `saveData()`, `registerView()`, etc.
+5. **Type safety**: Use TypeScript types for all interfaces and functions
+6. **Error handling**: Handle network errors, API errors, and validation errors gracefully
+
+## Integration Points
+
+### Obsidian API
+- `registerView()` - Register custom sidebar view
+- `addRibbonIcon()` - Add ribbon icon for opening view
+- `addSettingTab()` - Add settings tab
+- `loadData()` / `saveData()` - Persist settings
+- `vault.getMarkdownFiles()` - Get files for @ autocomplete
+
+### LLM API
+- OpenAI-compatible format
+- `/models` endpoint for model list
+- `/chat/completions` endpoint for chat
+- SSE streaming support
+
+## References
+
+@SPECIFICATION.md
+@code-style.mdc
