@@ -140,6 +140,67 @@ export class LLMClient {
     }
   }
 
+  async sendMessageNonStreaming(
+    model: string,
+    messages: ChatMessage[],
+    options?: ChatOptions
+  ): Promise<string> {
+    const url = this.proxy 
+      ? `${this.proxy}/chat/completions` 
+      : `${this.baseUrl}/chat/completions`;
+
+    const requestBody = {
+      model,
+      messages,
+      temperature: options?.temperature ?? 0.7,
+      max_tokens: options?.maxTokens ?? 2000,
+      stream: false,
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new LLMAPIError('Invalid API key', response.status);
+        }
+        if (response.status === 429) {
+          throw new RateLimitError('Rate limit exceeded');
+        }
+        if (response.status === 404) {
+          throw new InvalidModelError(`Model not found: ${model}`);
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new LLMAPIError(
+          `API error: ${response.statusText}`,
+          response.status,
+          errorData
+        );
+      }
+
+      const data = await response.json();
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
+      throw new LLMAPIError('Invalid response format');
+    } catch (error) {
+      if (error instanceof LLMAPIError || error instanceof InvalidModelError || error instanceof RateLimitError) {
+        throw error;
+      }
+      if (error instanceof TypeError) {
+        throw new NetworkError(`Network error: ${error.message}`);
+      }
+      throw new NetworkError(`Failed to send message: ${error}`);
+    }
+  }
+
   private async *parseSSEStream(body: ReadableStream<Uint8Array>): AsyncIterable<string> {
     const reader = body.getReader();
     const decoder = new TextDecoder();

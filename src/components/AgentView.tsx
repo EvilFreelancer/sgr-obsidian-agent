@@ -85,6 +85,9 @@ export class AgentView extends ItemView {
           (this.app as any).setting.open();
           (this.app as any).setting.openTabById(this.plugin.manifest.id);
         }}
+        onOpenHistory={async () => {
+          await this.plugin.activateHistoryView();
+        }}
       />
     );
   }

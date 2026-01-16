@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChatManager } from "../core/ChatManager";
 import { ChatMessage, FileContext } from "../types";
 import { ChatMode, CHAT_MODES } from "../constants";
 import { App } from "obsidian";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
-import { ChatHistory } from "./ChatHistory";
 
 interface ChatProps {
   chatManager: ChatManager;
@@ -17,6 +16,7 @@ interface ChatProps {
   defaultMode: ChatMode;
   onModeChange: (mode: ChatMode) => Promise<void>;
   onOpenSettings: () => void;
+  onOpenHistory: () => void;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -29,13 +29,14 @@ export const Chat: React.FC<ChatProps> = ({
   defaultMode,
   onModeChange: onModeChangeSettings,
   onOpenSettings,
+  onOpenHistory,
 }) => {
   const [mode, setMode] = useState<ChatMode>(defaultMode);
   const [model, setModel] = useState<string>(defaultModel);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const isStreamingStoppedRef = useRef(false);
 
   // Update messages when session changes
   const updateMessagesFromSession = useCallback(() => {
@@ -135,6 +136,10 @@ export const Chat: React.FC<ChatProps> = ({
 
     setIsStreaming(true);
     setStreamingContent("");
+    isStreamingStoppedRef.current = false;
+
+    let lastUpdateTime = Date.now();
+    const updateInterval = 500; // Update file every 500ms
 
     try {
       const stream = await chatManager.sendMessage(message);
@@ -143,9 +148,32 @@ export const Chat: React.FC<ChatProps> = ({
       // ChatManager already updates session via appendAssistantMessage
       let accumulatedContent = "";
       for await (const chunk of stream) {
+        if (isStreamingStoppedRef.current) {
+          // Stream was stopped, break the loop
+          break;
+        }
+        
         accumulatedContent += chunk;
         setStreamingContent(accumulatedContent);
         chatManager.appendAssistantMessage(chunk);
+
+        // Update file periodically during streaming
+        const now = Date.now();
+        if (now - lastUpdateTime >= updateInterval) {
+          try {
+            await chatManager.updateChatFile();
+            lastUpdateTime = now;
+          } catch (error) {
+            console.error("Failed to update chat file during streaming:", error);
+          }
+        }
+      }
+
+      // Update file after streaming completes (or was stopped)
+      try {
+        await chatManager.updateChatFile();
+      } catch (error) {
+        console.error("Failed to update chat file after streaming:", error);
       }
 
       // Update messages after streaming completes and clear streaming content
@@ -154,16 +182,30 @@ export const Chat: React.FC<ChatProps> = ({
     } catch (error) {
       console.error("Failed to send message:", error);
       setStreamingContent("");
+      // Try to save what we have
+      try {
+        await chatManager.updateChatFile();
+      } catch (saveError) {
+        console.error("Failed to update chat file on error:", saveError);
+      }
     } finally {
       setIsStreaming(false);
+      isStreamingStoppedRef.current = false;
     }
   }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
 
   // Handle stop streaming
-  const handleStop = useCallback(() => {
+  const handleStop = useCallback(async () => {
+    isStreamingStoppedRef.current = true;
     setIsStreaming(false);
+    // Save current state when stopping stream
+    try {
+      await chatManager.updateChatFile();
+    } catch (error) {
+      console.error("Failed to update chat file on stop:", error);
+    }
     setStreamingContent("");
-  }, []);
+  }, [chatManager]);
 
   // Handle save chat
   const handleSaveChat = useCallback(async () => {
@@ -175,21 +217,6 @@ export const Chat: React.FC<ChatProps> = ({
     }
   }, [chatManager, updateMessagesFromSession]);
 
-  // Handle load chat from history
-  const handleLoadChat = useCallback(async (filePath: string) => {
-    try {
-      await chatManager.loadSession(filePath);
-      updateMessagesFromSession();
-      const session = chatManager.getCurrentSession();
-      if (session) {
-        setMode(session.mode);
-        setModel(session.model);
-      }
-      setShowHistory(false);
-    } catch (error) {
-      console.error("Failed to load chat:", error);
-    }
-  }, [chatManager, updateMessagesFromSession]);
 
   return (
     <div className="sgr-chat">
@@ -206,7 +233,7 @@ export const Chat: React.FC<ChatProps> = ({
         <div className="sgr-top-bar-right">
           <button
             className="sgr-top-bar-button sgr-history-button"
-            onClick={() => setShowHistory(true)}
+            onClick={onOpenHistory}
             title="History"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -246,17 +273,6 @@ export const Chat: React.FC<ChatProps> = ({
         selectedModel={model}
         onModelChange={handleModelChange}
       />
-      {showHistory && (
-        <div className="sgr-chat-history-overlay" onClick={() => setShowHistory(false)}>
-          <div className="sgr-chat-history-modal" onClick={(e) => e.stopPropagation()}>
-            <ChatHistory
-              messageRepo={chatManager.getMessageRepository()}
-              onLoadChat={handleLoadChat}
-              onClose={() => setShowHistory(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

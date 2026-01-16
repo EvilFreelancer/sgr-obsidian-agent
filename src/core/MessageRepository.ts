@@ -56,9 +56,7 @@ export class MessageRepository {
   async saveChatWithTimestamp(
     messages: ChatMessage[],
     timestamp: number,
-    title: string = "New Chat",
-    model: string = "",
-    mode: string = ""
+    title: string = "New Chat"
   ): Promise<string> {
     await this.ensureFolderExists();
 
@@ -144,25 +142,13 @@ export class MessageRepository {
           timestamp: msg.timestamp,
         }));
 
-        // Extract model and mode from filename or use defaults
-        const fileName = file.basename;
-        const timestamp = parseInt(fileName.replace('.json', ''));
-        
-        // Try to get model and mode from messages (system message might have hints)
-        let model = '';
-        let mode = '';
-        
-        // Try to find in existing metadata if file was migrated
-        // For now, use defaults - these will be set when saving
-        model = chatData.model || '';
-        mode = chatData.mode || '';
-
+        // Model and mode are global settings, not stored in file
         const metadata: ChatHistoryMetadata = {
           title: chatData.title || 'New Chat',
           createdAt: chatData.created_at,
           lastAccessedAt: chatData.updated_at || chatData.created_at,
-          model,
-          mode,
+          model: '', // Will be set from global settings when loading
+          mode: '', // Will be set from global settings when loading
         };
 
         return {
@@ -198,13 +184,13 @@ export class MessageRepository {
           // Old format
           chats.push({ path: file.path, metadata: chatData.metadata as ChatHistoryMetadata });
         } else if (chatData.title !== undefined && chatData.created_at !== undefined) {
-          // New format
+          // New format - model and mode are global settings, not stored
           const metadata: ChatHistoryMetadata = {
             title: chatData.title || 'New Chat',
             createdAt: chatData.created_at,
             lastAccessedAt: chatData.updated_at || chatData.created_at,
-            model: chatData.model || '',
-            mode: chatData.mode || '',
+            model: '', // Global setting, not stored in file
+            mode: '', // Global setting, not stored in file
           };
           chats.push({ path: file.path, metadata });
         }

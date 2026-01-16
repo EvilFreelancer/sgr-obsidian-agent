@@ -18,6 +18,7 @@ export class ChatManager {
   private currentSession: ChatSession | null = null;
   private sessionTitle: string | null = null;
   private sessionTimestamp: number | null = null;
+  private currentChatFilePath: string | null = null;
 
   constructor(
     messageRepo: MessageRepository,
@@ -48,6 +49,7 @@ export class ChatManager {
     };
     this.sessionTitle = null;
     this.sessionTimestamp = Date.now();
+    this.currentChatFilePath = null;
 
     // Add system message
     const systemPrompt = SYSTEM_PROMPTS[mode];
@@ -112,9 +114,17 @@ export class ChatManager {
     };
     this.currentSession.messages.push(userMsg);
 
+    // Check if this is the first user message (only system message exists)
+    const isFirstMessage = this.currentSession.messages.filter(m => m.role === 'user').length === 1;
+
     // Generate title from first user message if not set
     if (!this.sessionTitle) {
-      this.sessionTitle = this.generateTitleFromMessage(userMessage);
+      this.sessionTitle = await this.generateTitle(userMessage);
+    }
+
+    // Create file immediately for first message
+    if (isFirstMessage) {
+      await this.createChatFile();
     }
 
     // Build messages for API with file contexts (but don't save to session)
@@ -186,6 +196,7 @@ export class ChatManager {
   clearSession(): void {
     this.currentSession = null;
     this.sessionTimestamp = null;
+    this.currentChatFilePath = null;
   }
 
   async autoSaveSession(): Promise<string | null> {
@@ -202,9 +213,7 @@ export class ChatManager {
     return await this.messageRepo.saveChatWithTimestamp(
       this.currentSession.messages,
       this.sessionTimestamp,
-      title,
-      this.currentSession.model,
-      this.currentSession.mode
+      title
     );
   }
 
@@ -228,7 +237,7 @@ export class ChatManager {
     return await this.messageRepo.saveChat(this.currentSession.messages, metadata);
   }
 
-  async loadSession(filePath: string): Promise<void> {
+  async loadSession(filePath: string, mode: ChatMode, model: string): Promise<void> {
     const { messages, metadata } = await this.messageRepo.loadChat(filePath);
     
     // Update lastAccessedAt in the saved file
@@ -244,8 +253,11 @@ export class ChatManager {
       this.sessionTimestamp = Date.now();
     }
     
-    // Add system message to the session
-    const systemPrompt = SYSTEM_PROMPTS[metadata.mode as ChatMode];
+    // Restore current chat file path
+    this.currentChatFilePath = filePath;
+    
+    // Add system message to the session using global mode
+    const systemPrompt = SYSTEM_PROMPTS[mode];
     const sessionMessages: ChatMessage[] = [
       {
         role: 'system',
@@ -256,8 +268,8 @@ export class ChatManager {
     
     this.currentSession = {
       messages: sessionMessages,
-      mode: metadata.mode as ChatMode,
-      model: metadata.model,
+      mode: mode,
+      model: model,
       fileContexts: [],
     };
   }
@@ -268,6 +280,117 @@ export class ChatManager {
 
   getSessionTitle(): string | null {
     return this.sessionTitle;
+  }
+
+  getCurrentChatFilePath(): string | null {
+    return this.currentChatFilePath;
+  }
+
+  async updateChatFile(): Promise<void> {
+    if (!this.currentSession || !this.currentChatFilePath) {
+      return;
+    }
+
+    if (!this.sessionTimestamp) {
+      this.sessionTimestamp = Date.now();
+    }
+
+    const title = this.sessionTitle || 'New Chat';
+    
+    await this.messageRepo.saveChatWithTimestamp(
+      this.currentSession.messages,
+      this.sessionTimestamp,
+      title
+    );
+  }
+
+  private async createChatFile(): Promise<void> {
+    if (!this.currentSession) {
+      return;
+    }
+
+    if (!this.sessionTimestamp) {
+      this.sessionTimestamp = Date.now();
+    }
+
+    const title = this.sessionTitle || 'New Chat';
+    
+    this.currentChatFilePath = await this.messageRepo.saveChatWithTimestamp(
+      this.currentSession.messages,
+      this.sessionTimestamp,
+      title
+    );
+  }
+
+  private async generateTitle(userMessage: string): Promise<string> {
+    // Clean message from markdown, file mentions, etc.
+    let cleanMessage = userMessage
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links
+      .replace(/`([^`]+)`/g, '$1') // Remove inline code
+      .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+      .replace(/@\[\[([^\]]+)\]\]/g, '$1') // Remove file mentions
+      .replace(/\[File: [^\]]+\][\s\S]*?\[\/File\]/g, '') // Remove file context blocks
+      .trim();
+
+    // Count words
+    const words = cleanMessage.split(/\s+/).filter(w => w.length > 0);
+    
+    // If 1-2 words, use them directly
+    if (words.length <= 2) {
+      let title = words.join(' ');
+      // Remove problematic characters for filenames
+      title = title.replace(/[<>:"/\\|?*]/g, '');
+      // Capitalize first letter
+      if (title.length > 0) {
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+      }
+      return title || 'Untitled Chat';
+    }
+
+    // For longer messages, use LLM to generate title
+    if (!this.llmClient || !this.currentSession) {
+      // Fallback to simple extraction if LLM not available
+      return this.generateTitleFromMessage(userMessage);
+    }
+
+    try {
+      const prompt = `Summarize the following user request in 2-5 words. Return only the summary, nothing else:\n\n${cleanMessage}`;
+      const title = await this.llmClient.sendMessageNonStreaming(
+        this.currentSession.model,
+        [
+          {
+            role: 'user',
+            content: prompt,
+          }
+        ],
+        {
+          temperature: 0.3,
+          maxTokens: 20,
+          stream: false,
+        }
+      );
+
+      // Clean and validate title
+      let cleanTitle = title.trim();
+      // Remove quotes if present
+      cleanTitle = cleanTitle.replace(/^["']|["']$/g, '');
+      // Remove problematic characters
+      cleanTitle = cleanTitle.replace(/[<>:"/\\|?*]/g, '');
+      // Limit length
+      if (cleanTitle.length > 60) {
+        cleanTitle = cleanTitle.substring(0, 57) + '...';
+      }
+      // Capitalize first letter
+      if (cleanTitle.length > 0) {
+        cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+      }
+
+      return cleanTitle || 'Untitled Chat';
+    } catch (error) {
+      // Fallback to simple extraction on error
+      console.error('Failed to generate title with LLM:', error);
+      return this.generateTitleFromMessage(userMessage);
+    }
   }
 
   private generateTitleFromMessage(message: string): string {

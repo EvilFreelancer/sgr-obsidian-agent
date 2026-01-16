@@ -1,4 +1,5 @@
 export const VIEW_TYPE = "sgr-agent-chat-view";
+export const VIEW_TYPE_HISTORY = "sgr-agent-chat-history-view";
 
 export const CHAT_MODES = {
   AGENT: "agent",

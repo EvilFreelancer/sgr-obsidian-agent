@@ -7,7 +7,7 @@ import { bm25Search } from "../utils/bm25Search";
 interface ChatHistoryProps {
   messageRepo: MessageRepository;
   onLoadChat: (filePath: string) => void;
-  onClose: () => void;
+  onBack: () => void;
 }
 
 interface ChatItem {
@@ -18,7 +18,7 @@ interface ChatItem {
 export const ChatHistory: React.FC<ChatHistoryProps> = ({
   messageRepo,
   onLoadChat,
-  onClose,
+  onBack,
 }) => {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,24 +48,25 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     return bm25Search(searchQuery, chats, 'title');
   }, [chats, searchQuery]);
 
-  const handleDelete = async (filePath: string) => {
-    if (confirm("Are you sure you want to delete this chat?")) {
-      try {
-        await messageRepo.deleteChat(filePath);
-        await loadChats();
-      } catch (error) {
-        console.error("Failed to delete chat:", error);
-      }
+  const handleDelete = async (e: React.MouseEvent, filePath: string) => {
+    e.stopPropagation(); // Prevent triggering chat load
+    try {
+      await messageRepo.deleteChat(filePath);
+      await loadChats();
+    } catch (error) {
+      console.error("Failed to delete chat:", error);
     }
   };
 
   return (
     <div className="sgr-chat-history-view">
       <div className="sgr-chat-history-header">
-        <h3>Chat History</h3>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          ×
+        <Button variant="ghost" size="sm" onClick={onBack} className="sgr-chat-history-back-button">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 12l-4-4 4-4"/>
+          </svg>
         </Button>
+        <h3>Chat History</h3>
       </div>
       <div className="sgr-chat-history-search">
         <input
@@ -86,7 +87,11 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
           </div>
         ) : (
           filteredChats.map((chat) => (
-            <div key={chat.path} className="sgr-chat-history-item">
+            <div 
+              key={chat.path} 
+              className="sgr-chat-history-item"
+              onClick={() => onLoadChat(chat.path)}
+            >
               <div className="sgr-chat-history-item-info">
                 <div className="sgr-chat-history-item-title">
                   {chat.metadata.title}
@@ -95,25 +100,15 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
                   {new Date(chat.metadata.lastAccessedAt).toLocaleString()} • {chat.metadata.model} • {chat.metadata.mode}
                 </div>
               </div>
-              <div className="sgr-chat-history-item-actions">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => {
-                    onLoadChat(chat.path);
-                    onClose();
-                  }}
-                >
-                  Load
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(chat.path)}
-                >
-                  Delete
-                </Button>
-              </div>
+              <button
+                className="sgr-chat-history-item-delete"
+                onClick={(e) => handleDelete(e, chat.path)}
+                title="Delete chat"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 4h12M4 4V3a1 1 0 011-1h6a1 1 0 011 1v1M3 4v9a1 1 0 001 1h8a1 1 0 001-1V4M6 7v4M10 7v4"/>
+                </svg>
+              </button>
             </div>
           ))
         )}

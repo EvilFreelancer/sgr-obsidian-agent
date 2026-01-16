@@ -511,16 +511,21 @@
 
 .sgr-chat-history-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 16px;
   border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.sgr-chat-history-back-button {
   flex-shrink: 0;
 }
 
 .sgr-chat-history-header h3 {
   margin: 0;
   font-size: 18px;
+  flex: 1;
 }
 
 .sgr-chat-history-search {
@@ -566,6 +571,8 @@
   padding: 12px;
   border-bottom: 1px solid var(--background-modifier-border);
   gap: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 .sgr-chat-history-item:last-child {
@@ -597,6 +604,25 @@
 .sgr-chat-history-item-actions {
   display: flex;
   gap: 8px;
+}
+
+.sgr-chat-history-item-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.sgr-chat-history-item-delete:hover {
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
 }
 
 /* Custom Select Styles */
