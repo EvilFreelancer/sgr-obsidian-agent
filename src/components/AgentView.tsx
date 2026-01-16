@@ -67,6 +67,30 @@ export class AgentView extends ItemView {
       return;
     }
 
+    // Try to load last chat if exists
+    const lastChatPath = this.plugin.settings.lastChatPath;
+    if (lastChatPath && this.plugin.messageRepo) {
+      try {
+        // Check if file exists
+        const file = this.app.vault.getAbstractFileByPath(lastChatPath);
+        if (file) {
+          // Load the last chat
+          const mode = this.plugin.settings.defaultMode;
+          const model = this.plugin.settings.defaultModel;
+          await chatManager.loadSession(lastChatPath, mode, model);
+        } else {
+          // File doesn't exist, clear lastChatPath
+          this.plugin.settings.lastChatPath = undefined;
+          await this.plugin.saveSettings();
+        }
+      } catch (error) {
+        console.error("Failed to load last chat:", error);
+        // Clear invalid lastChatPath
+        this.plugin.settings.lastChatPath = undefined;
+        await this.plugin.saveSettings();
+      }
+    }
+
     this.root = createRoot(contentEl);
     this.root.render(
       <Chat
@@ -87,6 +111,16 @@ export class AgentView extends ItemView {
         }}
         onOpenHistory={async () => {
           await this.plugin.activateHistoryView();
+        }}
+        onNewChat={async () => {
+          // Clear last chat path when starting new chat
+          this.plugin.settings.lastChatPath = undefined;
+          await this.plugin.saveSettings();
+        }}
+        onChatFileCreated={async (filePath: string) => {
+          // Save last chat path when chat file is created
+          this.plugin.settings.lastChatPath = filePath;
+          await this.plugin.saveSettings();
         }}
       />
     );

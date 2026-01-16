@@ -102,6 +102,9 @@ export class ChatHistoryView extends ItemView {
             const mode = this.plugin.settings.defaultMode;
             const model = this.plugin.settings.defaultModel;
             await chatManager.loadSession(filePath, mode, model);
+            // Save last chat path to settings
+            this.plugin.settings.lastChatPath = filePath;
+            await this.plugin.saveSettings();
           }
           // Switch back to main chat view and update it
           await this.plugin.activateView();
@@ -120,8 +123,15 @@ export class ChatHistoryView extends ItemView {
               if (model) {
                 chatManager.startSession(mode, model);
               }
+              // Clear last chat path if deleting current chat
+              this.plugin.settings.lastChatPath = undefined;
+              await this.plugin.saveSettings();
               // Update views to show new empty chat
               this.plugin.updateViews();
+            } else if (this.plugin.settings.lastChatPath === filePath) {
+              // If deleting the last opened chat, clear lastChatPath
+              this.plugin.settings.lastChatPath = undefined;
+              await this.plugin.saveSettings();
             }
           }
         }}

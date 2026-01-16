@@ -17,6 +17,8 @@ interface ChatProps {
   onModeChange: (mode: ChatMode) => Promise<void>;
   onOpenSettings: () => void;
   onOpenHistory: () => void;
+  onNewChat?: () => Promise<void>;
+  onChatFileCreated?: (filePath: string) => Promise<void>;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -30,6 +32,8 @@ export const Chat: React.FC<ChatProps> = ({
   onModeChange: onModeChangeSettings,
   onOpenSettings,
   onOpenHistory,
+  onNewChat,
+  onChatFileCreated,
 }) => {
   const [mode, setMode] = useState<ChatMode>(defaultMode);
   const [model, setModel] = useState<string>(defaultModel);
@@ -70,7 +74,7 @@ export const Chat: React.FC<ChatProps> = ({
   }, []);
 
   // Handle new chat
-  const handleNewChat = useCallback(() => {
+  const handleNewChat = useCallback(async () => {
     chatManager.clearSession();
     const newModel = model || defaultModel;
     if (newModel) {
@@ -78,8 +82,12 @@ export const Chat: React.FC<ChatProps> = ({
       updateMessagesFromSession();
       setStreamingContent("");
       setIsStreaming(false);
+      // Clear last chat path when starting new chat
+      if (onNewChat) {
+        await onNewChat();
+      }
     }
-  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
+  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession, onNewChat]);
 
   // Handle mode change
   const handleModeChange = useCallback(async (newMode: ChatMode) => {
@@ -184,6 +192,11 @@ export const Chat: React.FC<ChatProps> = ({
       // Update file after streaming completes (or was stopped)
       try {
         await chatManager.updateChatFile();
+        // Save last chat path after file is created/updated
+        const currentChatFilePath = chatManager.getCurrentChatFilePath();
+        if (currentChatFilePath && onChatFileCreated) {
+          await onChatFileCreated(currentChatFilePath);
+        }
       } catch (error) {
         console.error("Failed to update chat file after streaming:", error);
       }
@@ -197,6 +210,11 @@ export const Chat: React.FC<ChatProps> = ({
       // Try to save what we have
       try {
         await chatManager.updateChatFile();
+        // Save last chat path after file is created/updated
+        const currentChatFilePath = chatManager.getCurrentChatFilePath();
+        if (currentChatFilePath && onChatFileCreated) {
+          await onChatFileCreated(currentChatFilePath);
+        }
       } catch (saveError) {
         console.error("Failed to update chat file on error:", saveError);
       }
@@ -204,7 +222,7 @@ export const Chat: React.FC<ChatProps> = ({
       setIsStreaming(false);
       isStreamingStoppedRef.current = false;
     }
-  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
+  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession, onChatFileCreated]);
 
   // Handle stop streaming
   const handleStop = useCallback(async () => {
@@ -213,11 +231,16 @@ export const Chat: React.FC<ChatProps> = ({
     // Save current state when stopping stream
     try {
       await chatManager.updateChatFile();
+      // Save last chat path after file is created/updated
+      const currentChatFilePath = chatManager.getCurrentChatFilePath();
+      if (currentChatFilePath && onChatFileCreated) {
+        await onChatFileCreated(currentChatFilePath);
+      }
     } catch (error) {
       console.error("Failed to update chat file on stop:", error);
     }
     setStreamingContent("");
-  }, [chatManager]);
+  }, [chatManager, onChatFileCreated]);
 
   // Handle save chat
   const handleSaveChat = useCallback(async () => {

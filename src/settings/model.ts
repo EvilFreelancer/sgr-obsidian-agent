@@ -11,6 +11,7 @@ export interface AgentSettings {
   temperature: number;
   maxTokens: number;
   chatHistoryFolder: string;
+  lastChatPath?: string;
 }
 
 export function getDefaultSettings(): AgentSettings {
