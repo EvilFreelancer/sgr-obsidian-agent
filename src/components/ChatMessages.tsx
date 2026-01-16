@@ -15,6 +15,17 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 }) => {
   const displayMessages = messages.filter((msg) => msg.role !== "system");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Don't show streaming content if last message is assistant
+  // During streaming, we show streamingContent separately, but once it's added to messages,
+  // we should only show the message, not both
+  const lastMessage = displayMessages[displayMessages.length - 1];
+  const isLastMessageStreaming = lastMessage && 
+    lastMessage.role === "assistant" && 
+    streamingContent &&
+    lastMessage.content === streamingContent;
+  
+  const shouldShowStreaming = streamingContent && !isLastMessageStreaming;
 
   useEffect(() => {
     // Add click handlers for file mentions after render
@@ -91,7 +102,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         </div>
       ))}
-      {streamingContent && (
+      {shouldShowStreaming && (
         <div className="sgr-message sgr-message-assistant sgr-message-streaming">
           <div className="sgr-message-header">
             <strong>Assistant</strong>

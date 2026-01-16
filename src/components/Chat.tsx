@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChatManager } from "../core/ChatManager";
+import { ChatMessage, FileContext } from "../types";
 import { ChatMode, CHAT_MODES } from "../constants";
-import { FileContext, ChatMessage } from "../types";
+import { App } from "obsidian";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
+import { ChatControls } from "./ChatControls";
+import { ModelSelector } from "./ModelSelector";
 import { ChatHistory } from "./ChatHistory";
-import { App, Notice } from "obsidian";
 
 interface ChatProps {
   chatManager: ChatManager;
@@ -24,113 +26,98 @@ export const Chat: React.FC<ChatProps> = ({
   proxy,
   defaultModel,
 }) => {
-  const [mode, setMode] = useState<ChatMode>(CHAT_MODES.AGENT);
-  const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string; timestamp?: number }>>([]);
+  const [mode, setMode] = useState<ChatMode>(CHAT_MODES.ASK);
+  const [model, setModel] = useState<string>(defaultModel);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [hasLoadedLastChat, setHasLoadedLastChat] = useState(false);
-  const streamCancelledRef = useRef<boolean>(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load last chat on mount if no active session exists
-  useEffect(() => {
-    if (hasLoadedLastChat || !selectedModel) {
-      return; // Already loaded or waiting for model selection
+  // Update messages when session changes
+  const updateMessagesFromSession = useCallback(() => {
+    const session = chatManager.getCurrentSession();
+    if (session) {
+      setMessages(session.messages);
+    } else {
+      setMessages([]);
     }
+  }, [chatManager]);
 
-    const loadLastChat = async () => {
-      // Check if there's already an active session
-      const currentSession = chatManager.getCurrentSession();
-      if (currentSession && currentSession.messages.length > 1) {
-        // Session already exists (has more than just system message), don't load last chat
-        setHasLoadedLastChat(true);
-        // Update UI with existing session
-        const displayMessages = currentSession.messages
-          .filter((msg) => msg.role !== "system")
-          .map((msg) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-            timestamp: msg.timestamp,
-          }));
-        setMessages(displayMessages);
-        setMode(currentSession.mode);
-        setSelectedModel(currentSession.model);
-        return;
-      }
-
-      // No active session, try to load last chat
-      try {
-        const messageRepo = chatManager.getMessageRepository();
-        const lastChat = await messageRepo.getLastChat();
-        
-        if (lastChat) {
-          // Load the last chat
-          await chatManager.loadSession(lastChat.path);
-          const session = chatManager.getCurrentSession();
-          if (session) {
-            const displayMessages = session.messages
-              .filter((msg) => msg.role !== "system")
-              .map((msg) => ({
-                role: msg.role as "user" | "assistant",
-                content: msg.content,
-                timestamp: msg.timestamp,
-              }));
-            setMessages(displayMessages);
-            setMode(session.mode);
-            setSelectedModel(session.model);
-          }
-          setHasLoadedLastChat(true);
-        } else {
-          // No chat history, start new session
-          chatManager.startSession(mode, selectedModel);
-          setMessages([]);
-          setStreamingContent("");
-          setHasLoadedLastChat(true);
-        }
-      } catch (error) {
-        console.error("Failed to load last chat:", error);
-        // Start new session on error
-        chatManager.startSession(mode, selectedModel);
-        setMessages([]);
-        setStreamingContent("");
-        setHasLoadedLastChat(true);
-      }
-    };
-
-    loadLastChat();
-  }, [selectedModel, hasLoadedLastChat, chatManager, mode]);
-
-  // Handle mode/model changes after initial load
+  // Initialize session on mount
   useEffect(() => {
-    if (hasLoadedLastChat && selectedModel) {
-      const currentSession = chatManager.getCurrentSession();
-      // Only start new session if user explicitly changed mode or model
-      // and there's no active session with messages
-      if (!currentSession || currentSession.messages.length <= 1) {
-        chatManager.startSession(mode, selectedModel);
-        setMessages([]);
-        setStreamingContent("");
+    const session = chatManager.getCurrentSession();
+    if (!session) {
+      // Start new session if none exists
+      const initialModel = model || defaultModel;
+      if (initialModel) {
+        chatManager.startSession(mode, initialModel);
+        updateMessagesFromSession();
       }
+    } else {
+      // Update state from existing session
+      updateMessagesFromSession();
+      setMode(session.mode);
+      setModel(session.model);
     }
-  }, [mode, selectedModel, hasLoadedLastChat, chatManager]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent]);
+  // Handle new chat
+  const handleNewChat = useCallback(() => {
+    chatManager.clearSession();
+    const newModel = model || defaultModel;
+    if (newModel) {
+      chatManager.startSession(mode, newModel);
+      updateMessagesFromSession();
+      setStreamingContent("");
+      setIsStreaming(false);
+    }
+  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Handle mode change
+  const handleModeChange = useCallback((newMode: ChatMode) => {
+    setMode(newMode);
+    const currentModel = model || defaultModel;
+    if (currentModel) {
+      chatManager.clearSession();
+      chatManager.startSession(newMode, currentModel);
+      updateMessagesFromSession();
+      setStreamingContent("");
+      setIsStreaming(false);
+    }
+  }, [chatManager, model, defaultModel, updateMessagesFromSession]);
 
-  const handleSend = async (message: string, files: FileContext[]) => {
-    if (!selectedModel) {
-      new Notice("Please select a model first");
+  // Handle model change
+  const handleModelChange = useCallback((newModel: string) => {
+    setModel(newModel);
+    const session = chatManager.getCurrentSession();
+    if (session) {
+      // Update session with new model
+      chatManager.clearSession();
+      chatManager.startSession(session.mode, newModel);
+      updateMessagesFromSession();
+    }
+  }, [chatManager, updateMessagesFromSession]);
+
+  // Handle send message
+  const handleSend = useCallback(async (message: string, files: FileContext[]) => {
+    const currentModel = model || defaultModel;
+    if (!currentModel) {
       return;
     }
 
-    // Add file contexts to chat manager
+    // Ensure session exists
+    let session = chatManager.getCurrentSession();
+    if (!session) {
+      chatManager.startSession(mode, currentModel);
+      session = chatManager.getCurrentSession();
+    }
+
+    if (!session) {
+      return;
+    }
+
+    // Add file contexts
     for (const file of files) {
       try {
         await chatManager.addFileContext(file.path);
@@ -139,210 +126,111 @@ export const Chat: React.FC<ChatProps> = ({
       }
     }
 
-    // Add user message to UI
-    const userMessage = { role: "user" as const, content: message, timestamp: Date.now() };
-    setMessages((prev) => [...prev, userMessage]);
-    setIsLoading(true);
+    setIsStreaming(true);
     setStreamingContent("");
 
-    // Auto-save after user message is added
     try {
-      await chatManager.autoSaveSession();
-    } catch (error) {
-      console.error("Failed to auto-save chat:", error);
-    }
-
-    try {
-      streamCancelledRef.current = false;
       const stream = await chatManager.sendMessage(message);
-      let fullContent = "";
-
+      
+      // Process stream - accumulate content in streamingContent
+      // ChatManager already updates session via appendAssistantMessage
+      let accumulatedContent = "";
       for await (const chunk of stream) {
-        if (streamCancelledRef.current) {
-          break;
-        }
-        fullContent += chunk;
-        setStreamingContent(fullContent);
+        accumulatedContent += chunk;
+        setStreamingContent(accumulatedContent);
+        chatManager.appendAssistantMessage(chunk);
       }
 
-      // Finalize message if not cancelled
-      if (!streamCancelledRef.current && fullContent) {
-        chatManager.appendAssistantMessage(fullContent);
-        
-        // Auto-save after assistant response
-        try {
-          await chatManager.autoSaveSession();
-        } catch (error) {
-          console.error("Failed to auto-save chat:", error);
-        }
-
-        const session = chatManager.getCurrentSession();
-        if (session) {
-          const displayMessages = session.messages
-            .filter((msg) => msg.role !== "system")
-            .map((msg) => ({
-              role: msg.role as "user" | "assistant",
-              content: msg.content,
-              timestamp: msg.timestamp,
-            }));
-          setMessages(displayMessages);
-        }
-      }
+      // Update messages after streaming completes and clear streaming content
+      updateMessagesFromSession();
       setStreamingContent("");
-    } catch (error: any) {
-      if (!streamCancelledRef.current) {
-        new Notice(`Error: ${error.message || "Failed to send message"}`);
-        console.error("Error sending message:", error);
-      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setStreamingContent("");
     } finally {
-      setIsLoading(false);
-      streamCancelledRef.current = false;
+      setIsStreaming(false);
     }
-  };
+  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
 
-  const handleStop = () => {
-    if (isLoading) {
-      streamCancelledRef.current = true;
-      setIsLoading(false);
-      setStreamingContent("");
-      
-      // Save current state
-      const session = chatManager.getCurrentSession();
-      if (session) {
-        const displayMessages = session.messages
-          .filter((msg) => msg.role !== "system")
-          .map((msg) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-            timestamp: msg.timestamp,
-          }));
-        setMessages(displayMessages);
-      }
-      
-      // Auto-save after stopping
-      chatManager.autoSaveSession().catch((error) => {
-        console.error("Failed to auto-save chat:", error);
-      });
-    }
-  };
+  // Handle stop streaming
+  const handleStop = useCallback(() => {
+    setIsStreaming(false);
+    setStreamingContent("");
+  }, []);
 
-  const handleModeChange = (newMode: ChatMode) => {
-    setMode(newMode);
-  };
-
-  const handleNewChat = () => {
-    if (selectedModel) {
-      chatManager.startSession(mode, selectedModel);
-      setMessages([]);
-      setStreamingContent("");
-    }
-  };
-
-  const handleSaveChat = async () => {
-    const session = chatManager.getCurrentSession();
-    if (!session || session.messages.length === 0) {
-      new Notice("No chat to save");
-      return;
-    }
-
-    // Use generated title or prompt for custom title
-    const generatedTitle = chatManager.getSessionTitle();
-    const defaultTitle = generatedTitle || `Chat ${new Date().toLocaleString()}`;
-    const title = prompt("Enter chat title:", defaultTitle);
-    if (!title) return;
-
+  // Handle save chat
+  const handleSaveChat = useCallback(async () => {
     try {
-      await chatManager.saveSession(title);
-      new Notice("Chat saved successfully");
-    } catch (error: any) {
-      new Notice(`Failed to save chat: ${error.message}`);
+      await chatManager.saveSession();
+      updateMessagesFromSession();
+    } catch (error) {
+      console.error("Failed to save chat:", error);
     }
-  };
+  }, [chatManager, updateMessagesFromSession]);
 
-  const handleLoadChat = async (filePath: string) => {
+  // Handle load chat from history
+  const handleLoadChat = useCallback(async (filePath: string) => {
     try {
       await chatManager.loadSession(filePath);
+      updateMessagesFromSession();
       const session = chatManager.getCurrentSession();
       if (session) {
-        const displayMessages = session.messages
-          .filter((msg) => msg.role !== "system")
-          .map((msg) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-            timestamp: msg.timestamp,
-          }));
-        setMessages(displayMessages);
         setMode(session.mode);
-        setSelectedModel(session.model);
+        setModel(session.model);
       }
-      new Notice("Chat loaded successfully");
-    } catch (error: any) {
-      new Notice(`Failed to load chat: ${error.message}`);
+      setShowHistory(false);
+    } catch (error) {
+      console.error("Failed to load chat:", error);
     }
-  };
-
-  const displayMessages: ChatMessage[] = messages.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-    timestamp: msg.timestamp,
-  }));
+  }, [chatManager, updateMessagesFromSession]);
 
   return (
-    <div className="sgr-chat-container">
-      {showHistory ? (
-        <ChatHistory
-          messageRepo={chatManager.getMessageRepository()}
-          onLoadChat={handleLoadChat}
-          onClose={() => setShowHistory(false)}
+    <div className="sgr-chat">
+      <ModelSelector
+        baseUrl={baseUrl}
+        apiKey={apiKey}
+        proxy={proxy}
+        selectedModel={model}
+        onModelChange={handleModelChange}
+      />
+      <ChatControls
+        mode={mode}
+        onModeChange={handleModeChange}
+        onNewChat={handleNewChat}
+        onSaveChat={handleSaveChat}
+        onLoadHistory={() => setShowHistory(true)}
+      />
+      <div className="sgr-chat-messages-container">
+        <ChatMessages
+          messages={messages}
+          streamingContent={streamingContent}
+          app={app}
         />
-      ) : (
-        <>
-          <div className="sgr-chat-top-bar">
-            <button
-              className="sgr-top-bar-button"
-              onClick={handleNewChat}
-              title="New Chat"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 2v12M2 8h12" />
-              </svg>
-            </button>
-            <button
-              className="sgr-top-bar-button"
-              onClick={() => setShowHistory(true)}
-              title="Chat History"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M8 4v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          <div className="sgr-chat-messages-container">
-            <ChatMessages
-              messages={displayMessages}
-              streamingContent={streamingContent}
-              app={app}
-            />
-            <div ref={messagesEndRef} />
-          </div>
-          <div className="sgr-chat-input-container-wrapper">
-            <ChatInput
-              onSend={handleSend}
-              onStop={handleStop}
-              disabled={!selectedModel}
-              isLoading={isLoading}
-              app={app}
-              mode={mode}
-              onModeChange={handleModeChange}
-              baseUrl={baseUrl}
-              apiKey={apiKey}
-              proxy={proxy}
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
+      </div>
+      <ChatInput
+        onSend={handleSend}
+        onStop={handleStop}
+        disabled={isStreaming}
+        isLoading={isStreaming}
+        app={app}
+        mode={mode}
+        onModeChange={handleModeChange}
+        baseUrl={baseUrl}
+        apiKey={apiKey}
+        proxy={proxy}
+        selectedModel={model}
+        onModelChange={handleModelChange}
+      />
+      {showHistory && (
+        <div className="sgr-chat-history-overlay" onClick={() => setShowHistory(false)}>
+          <div className="sgr-chat-history-modal" onClick={(e) => e.stopPropagation()}>
+            <ChatHistory
+              messageRepo={chatManager.getMessageRepository()}
+              onLoadChat={handleLoadChat}
+              onClose={() => setShowHistory(false)}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
