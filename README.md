@@ -2,6 +2,8 @@
 
 An AI assistant plugin for Obsidian that works with LLM through OpenAI-compatible API in agent format. This plugin provides a sidebar chat interface similar to implementations in VS Code and Cursor.
 
+![SGR Obsidian Agent](/assets/intro.png)
+
 ## Features
 
 - **Sidebar Chat Interface**: Clean, modern chat interface in a sidebar panel
