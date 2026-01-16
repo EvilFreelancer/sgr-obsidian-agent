@@ -1048,6 +1048,7 @@
   justify-content: flex-start;
   cursor: pointer;
   transition: background 0.2s;
+  border-radius: 0;
 }
 
 .sgr-custom-select-option:hover {
