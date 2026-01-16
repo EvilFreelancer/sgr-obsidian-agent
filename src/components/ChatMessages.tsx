@@ -202,6 +202,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               className={message.role === "assistant" ? "sgr-markdown" : "sgr-message-text"}
             />
           </div>
+          <CopyButton content={message.content} />
         </div>
       ))}
       {shouldShowStreaming && (
@@ -216,6 +217,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               className="sgr-markdown"
             />
           </div>
+          <CopyButton content={streamingContent} />
         </div>
       )}
     </div>
@@ -233,96 +235,471 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, app, classNa
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Preprocess content: replace file mentions and file blocks with placeholders
+  // Use HTML entities to avoid markdown parsing issues
   const preprocessContent = (text: string): string => {
     // Remove file context blocks [File: ...] and replace with placeholder
     // Pattern: [File: path]\ncontent\n[/File]
     let processed = text.replace(/\[File:\s*([^\]]+)\][\s\S]*?\[\/File\]/g, (match, filePath) => {
       const fileName = filePath.split('/').pop() || filePath;
-      return `__FILE_BLOCK_PLACEHOLDER__${filePath}__FILE_BLOCK_PLACEHOLDER__`;
+      // Use HTML entities to avoid markdown parsing
+      return `\u0001FILE_BLOCK\u0002${filePath}\u0003FILE_BLOCK\u0001`;
     });
 
     // Replace @[[filename]] mentions with placeholders
     processed = processed.replace(/@\[\[([^\]]+)\]\]/g, (match, filePath) => {
-      return `__FILE_MENTION_PLACEHOLDER__${filePath}__FILE_MENTION_PLACEHOLDER__`;
+      // Use control characters that won't be parsed by markdown
+      return `\u0001FILE_MENTION\u0002${filePath}\u0003FILE_MENTION\u0001`;
     });
 
     return processed;
   };
 
-  // Process rendered content to replace placeholders with clickable file mentions
+  // Post-process rendered content to handle placeholders and @ mentions that weren't caught by components
   useEffect(() => {
     if (!containerRef.current) return;
 
     const container = containerRef.current;
+    
+    // Find all text nodes and process placeholders and @ mentions
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
 
-    // Replace file block placeholders
-    const fileBlockRegex = /__FILE_BLOCK_PLACEHOLDER__([^_]+)__FILE_BLOCK_PLACEHOLDER__/g;
-    let html = container.innerHTML;
-    html = html.replace(fileBlockRegex, (match, filePath) => {
-      const fileName = filePath.split('/').pop() || filePath;
-      const escapedPath = filePath
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-      return `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
-    });
+    const textNodes: Text[] = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+        // Check if text contains placeholders or @ mention pattern
+        const text = node.textContent;
+        if (
+          /\u0001FILE_(BLOCK|MENTION)\u0002/.test(text) ||
+          /@\[\[[^\]]+\]\]/.test(text)
+        ) {
+          textNodes.push(node as Text);
+        }
+      }
+    }
 
-    // Replace file mention placeholders
-    const fileMentionRegex = /__FILE_MENTION_PLACEHOLDER__([^_]+)__FILE_MENTION_PLACEHOLDER__/g;
-    html = html.replace(fileMentionRegex, (match, filePath) => {
-      const fileName = filePath.split('/').pop() || filePath;
-      const escapedPath = filePath
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-      return `<span class="sgr-file-mention" data-file-path="${escapedPath}" style="color: var(--link-color); cursor: pointer; text-decoration: underline;">@${fileName}</span>`;
-    });
+    // Process text nodes with placeholders or @ mentions
+    textNodes.forEach((textNode) => {
+      const text = textNode.textContent || '';
+      const parts: (string | HTMLElement)[] = [];
+      let lastIndex = 0;
 
-    container.innerHTML = html;
+      // Process placeholders first (control characters)
+      const fileBlockRegex = /\u0001FILE_BLOCK\u0002([^\u0003]+)\u0003FILE_BLOCK\u0001/g;
+      const fileMentionRegex = /\u0001FILE_MENTION\u0002([^\u0003]+)\u0003FILE_MENTION\u0001/g;
+      const placeholderMatches: Array<{ index: number; length: number; filePath: string }> = [];
+      let match;
 
-    // Add click handlers for file mentions
-    const fileMentions = container.querySelectorAll('.sgr-file-mention');
-    const clickHandlers: Array<{ element: Element; handler: (e: Event) => void }> = [];
+      while ((match = fileBlockRegex.exec(text)) !== null) {
+        placeholderMatches.push({
+          index: match.index,
+          length: match[0].length,
+          filePath: match[1],
+        });
+      }
 
-    fileMentions.forEach((mention) => {
-      const filePath = mention.getAttribute('data-file-path');
-      if (filePath) {
-        const handler = (e: Event) => {
+      while ((match = fileMentionRegex.exec(text)) !== null) {
+        placeholderMatches.push({
+          index: match.index,
+          length: match[0].length,
+          filePath: match[1],
+        });
+      }
+
+      // Also check for @ mentions that weren't replaced
+      const mentionRegex = /@\[\[([^\]]+)\]\]/g;
+      while ((match = mentionRegex.exec(text)) !== null) {
+        placeholderMatches.push({
+          index: match.index,
+          length: match[0].length,
+          filePath: match[1],
+        });
+      }
+
+      // Sort by index
+      placeholderMatches.sort((a, b) => a.index - b.index);
+
+      // Process matches
+      placeholderMatches.forEach((matchInfo) => {
+        // Add text before match
+        if (matchInfo.index > lastIndex) {
+          const beforeText = text.substring(lastIndex, matchInfo.index);
+          if (beforeText) {
+            parts.push(beforeText);
+          }
+        }
+        // Create file mention element
+        const filePath = matchInfo.filePath;
+        const fileName = filePath.split('/').pop() || filePath;
+        const mentionSpan = document.createElement('span');
+        mentionSpan.className = 'sgr-file-mention';
+        mentionSpan.setAttribute('data-file-path', filePath);
+        mentionSpan.style.color = 'var(--link-color)';
+        mentionSpan.style.cursor = 'pointer';
+        mentionSpan.style.textDecoration = 'underline';
+        mentionSpan.textContent = `@${fileName}`;
+        
+        // Add click handler
+        mentionSpan.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          // Normalize file path - add .md extension if not present
           let normalizedPath = filePath;
           if (!normalizedPath.endsWith('.md') && !normalizedPath.includes('.')) {
             normalizedPath = normalizedPath + '.md';
           }
-
           try {
             app.workspace.openLinkText(normalizedPath, '', true);
           } catch (error) {
             console.error('Failed to open file:', normalizedPath, error);
           }
-        };
+        });
+        
+        parts.push(mentionSpan);
+        lastIndex = matchInfo.index + matchInfo.length;
+      });
 
-        mention.addEventListener('click', handler);
-        clickHandlers.push({ element: mention, handler });
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+      }
+
+      // Replace text node with processed content
+      if (parts.length > 1 || (parts.length === 1 && parts[0] instanceof HTMLElement)) {
+        const fragment = document.createDocumentFragment();
+        parts.forEach((part) => {
+          if (typeof part === 'string') {
+            fragment.appendChild(document.createTextNode(part));
+          } else {
+            fragment.appendChild(part);
+          }
+        });
+        textNode.parentNode?.replaceChild(fragment, textNode);
       }
     });
-
-    return () => {
-      clickHandlers.forEach(({ element, handler }) => {
-        element.removeEventListener('click', handler);
-      });
-    };
   }, [content, app]);
+
+  // Process text to replace placeholders with clickable file mentions
+  const processTextNode = (node: any, keyPrefix: string = ''): React.ReactNode => {
+    if (typeof node === 'string') {
+      return processTextWithPlaceholders(node, keyPrefix);
+    }
+
+    if (Array.isArray(node)) {
+      return node.map((child, index) => (
+        <React.Fragment key={`${keyPrefix}-${index}`}>
+          {processTextNode(child, `${keyPrefix}-${index}`)}
+        </React.Fragment>
+      ));
+    }
+
+    if (React.isValidElement(node)) {
+      // If it's a React element, process its children
+      const props = node.props as { children?: React.ReactNode };
+      if (props && props.children) {
+        return React.cloneElement(node, {
+          ...props,
+          children: processTextNode(props.children, keyPrefix),
+        } as any);
+      }
+    }
+
+    return node;
+  };
+
+  // Process text with placeholders and replace with file mentions
+  const processTextWithPlaceholders = (text: string, keyPrefix: string): React.ReactNode => {
+    if (!text) return text;
+    
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let key = 0;
+
+    // Use control characters to match placeholders
+    // Format: \u0001FILE_MENTION\u0002{filePath}\u0003FILE_MENTION\u0001
+    const fileBlockRegex = /\u0001FILE_BLOCK\u0002([^\u0003]+)\u0003FILE_BLOCK\u0001/g;
+    const fileMentionRegex = /\u0001FILE_MENTION\u0002([^\u0003]+)\u0003FILE_MENTION\u0001/g;
+    const textToProcess = text;
+    const matches: Array<{ index: number; length: number; filePath: string }> = [];
+    let match;
+
+    // Collect all file block matches
+    while ((match = fileBlockRegex.exec(textToProcess)) !== null) {
+      matches.push({
+        index: match.index,
+        length: match[0].length,
+        filePath: match[1],
+      });
+    }
+
+    // Collect all file mention matches
+    while ((match = fileMentionRegex.exec(textToProcess)) !== null) {
+      matches.push({
+        index: match.index,
+        length: match[0].length,
+        filePath: match[1],
+      });
+    }
+
+    // If no matches, check for @ mentions that weren't replaced (fallback)
+    if (matches.length === 0) {
+      // Check if there are @ mentions that weren't replaced (fallback)
+      if (/@\[\[[^\]]+\]\]/.test(text)) {
+        // Process @ mentions directly
+        const mentionRegex = /@\[\[([^\]]+)\]\]/g;
+        const mentionMatches: Array<{ index: number; length: number; filePath: string }> = [];
+        while ((match = mentionRegex.exec(text)) !== null) {
+          mentionMatches.push({
+            index: match.index,
+            length: match[0].length,
+            filePath: match[1],
+          });
+        }
+        
+        if (mentionMatches.length > 0) {
+          let lastIdx = 0;
+          mentionMatches.forEach((matchInfo) => {
+            if (matchInfo.index > lastIdx) {
+              parts.push(text.substring(lastIdx, matchInfo.index));
+            }
+            const fileName = matchInfo.filePath.split('/').pop() || matchInfo.filePath;
+            parts.push(
+              <FileMention
+                key={`${keyPrefix}-mention-${key++}`}
+                filePath={matchInfo.filePath}
+                fileName={fileName}
+                app={app}
+              />
+            );
+            lastIdx = matchInfo.index + matchInfo.length;
+          });
+          if (lastIdx < text.length) {
+            parts.push(text.substring(lastIdx));
+          }
+          return <>{parts}</>;
+        }
+      }
+      return text;
+    }
+
+    // Sort matches by index
+    matches.sort((a, b) => a.index - b.index);
+
+    // Process matches in order
+    for (const matchInfo of matches) {
+      // Add text before match
+      if (matchInfo.index > lastIndex) {
+        const beforeText = textToProcess.substring(lastIndex, matchInfo.index);
+        if (beforeText) {
+          parts.push(beforeText);
+          key += beforeText.length;
+        }
+      }
+      // Add file mention
+      const fileName = matchInfo.filePath.split('/').pop() || matchInfo.filePath;
+      parts.push(
+        <FileMention
+          key={`${keyPrefix}-file-${key}`}
+          filePath={matchInfo.filePath}
+          fileName={fileName}
+          app={app}
+        />
+      );
+      lastIndex = matchInfo.index + matchInfo.length;
+      key++;
+    }
+
+    // Add remaining text
+    if (lastIndex < textToProcess.length) {
+      parts.push(textToProcess.substring(lastIndex));
+    }
+
+    return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>;
+  };
+
+  // Custom components for react-markdown to process text nodes
+  // Use text component to catch all text nodes including @ mentions
+  const components: any = {
+    // Process text nodes directly
+    text: ({ children, ...props }: any) => {
+      if (typeof children === 'string') {
+        return processTextWithPlaceholders(children, 'text');
+      }
+      return children;
+    },
+    p: ({ children, ...props }: any) => {
+      return <p {...props}>{processTextNode(children, 'p')}</p>;
+    },
+    li: ({ children, ...props }: any) => {
+      return <li {...props}>{processTextNode(children, 'li')}</li>;
+    },
+    h1: ({ children, ...props }: any) => {
+      return <h1 {...props}>{processTextNode(children, 'h1')}</h1>;
+    },
+    h2: ({ children, ...props }: any) => {
+      return <h2 {...props}>{processTextNode(children, 'h2')}</h2>;
+    },
+    h3: ({ children, ...props }: any) => {
+      return <h3 {...props}>{processTextNode(children, 'h3')}</h3>;
+    },
+    h4: ({ children, ...props }: any) => {
+      return <h4 {...props}>{processTextNode(children, 'h4')}</h4>;
+    },
+    h5: ({ children, ...props }: any) => {
+      return <h5 {...props}>{processTextNode(children, 'h5')}</h5>;
+    },
+    h6: ({ children, ...props }: any) => {
+      return <h6 {...props}>{processTextNode(children, 'h6')}</h6>;
+    },
+    blockquote: ({ children, ...props }: any) => {
+      return <blockquote {...props}>{processTextNode(children, 'blockquote')}</blockquote>;
+    },
+    td: ({ children, ...props }: any) => {
+      return <td {...props}>{processTextNode(children, 'td')}</td>;
+    },
+    th: ({ children, ...props }: any) => {
+      return <th {...props}>{processTextNode(children, 'th')}</th>;
+    },
+    strong: ({ children, ...props }: any) => {
+      return <strong {...props}>{processTextNode(children, 'strong')}</strong>;
+    },
+    em: ({ children, ...props }: any) => {
+      return <em {...props}>{processTextNode(children, 'em')}</em>;
+    },
+    span: ({ children, ...props }: any) => {
+      return <span {...props}>{processTextNode(children, 'span')}</span>;
+    },
+    // Handle code blocks - don't process @ mentions inside code
+    code: ({ children, ...props }: any) => {
+      // Don't process file mentions in code blocks
+      return <code {...props}>{children}</code>;
+    },
+    pre: ({ children, ...props }: any) => {
+      // Don't process file mentions in pre blocks
+      return <pre {...props}>{children}</pre>;
+    },
+    // Handle links - check if it's a file mention
+    a: ({ href, children, ...props }: any) => {
+      // If href looks like @[[file]], treat it as file mention
+      if (href && href.startsWith('@[[') && href.endsWith(']]')) {
+        const filePath = href.slice(3, -2);
+        const fileName = filePath.split('/').pop() || filePath;
+        return (
+          <FileMention
+            filePath={filePath}
+            fileName={fileName}
+            app={app}
+          />
+        );
+      }
+      // Otherwise, process children for file mentions
+      return <a href={href} {...props}>{processTextNode(children, 'a')}</a>;
+    },
+  };
 
   const processedContent = preprocessContent(content);
 
   return (
     <div ref={containerRef} className={className}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {processedContent}
       </ReactMarkdown>
     </div>
+  );
+};
+
+// Component for clickable file mentions
+interface FileMentionProps {
+  filePath: string;
+  fileName: string;
+  app: App;
+}
+
+const FileMention: React.FC<FileMentionProps> = ({ filePath, fileName, app }) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Normalize file path - add .md extension if not present
+    let normalizedPath = filePath;
+    if (!normalizedPath.endsWith('.md') && !normalizedPath.includes('.')) {
+      normalizedPath = normalizedPath + '.md';
+    }
+
+    try {
+      app.workspace.openLinkText(normalizedPath, '', true);
+    } catch (error) {
+      console.error('Failed to open file:', normalizedPath, error);
+    }
+  };
+
+  return (
+    <span
+      className="sgr-file-mention"
+      onClick={handleClick}
+      style={{
+        color: 'var(--link-color)',
+        cursor: 'pointer',
+        textDecoration: 'underline',
+      }}
+    >
+      @{fileName}
+    </span>
+  );
+};
+
+// Component for copying message content to clipboard
+interface CopyButtonProps {
+  content: string;
+}
+
+const CopyButton: React.FC<CopyButtonProps> = ({ content }) => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  return (
+    <button
+      className="sgr-copy-button"
+      onClick={handleCopy}
+      title="Copy"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
   );
 };

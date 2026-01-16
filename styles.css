@@ -258,12 +258,27 @@
   gap: 4px;
   padding: 12px;
   border-radius: 8px;
-  max-width: 80%;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 .sgr-message-user {
   align-self: flex-end;
   background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  max-width: 80%;
+}
+
+/* Text selection styles for user messages */
+.sgr-message-user ::selection {
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--text-on-accent);
+}
+
+.sgr-message-user ::-moz-selection {
+  background: rgba(255, 255, 255, 0.3);
   color: var(--text-on-accent);
 }
 
@@ -271,6 +286,7 @@
   align-self: flex-start;
   background: var(--background-secondary);
   color: var(--text-normal);
+  width: 100%;
 }
 
 .sgr-message-streaming {
@@ -286,16 +302,156 @@
 .sgr-message-content {
   font-size: 14px;
   line-height: 1.5;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+.sgr-copy-button {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  flex-shrink: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.sgr-copy-button:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: none;
+}
+
+.sgr-copy-button:active {
+  opacity: 0.8;
+  background: none;
+}
+
+.sgr-copy-button:focus {
+  outline: none;
+  background: none;
+}
+
+.sgr-copy-button svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.sgr-message-user .sgr-copy-button {
+  color: rgba(255, 255, 255, 0.9) !important;
+  opacity: 1 !important;
+}
+
+.sgr-message-user .sgr-copy-button:hover {
+  color: rgba(255, 255, 255, 1) !important;
+  opacity: 1 !important;
 }
 
 .sgr-message-text {
   white-space: pre-wrap;
   word-wrap: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Reset margins for message text elements */
+.sgr-message-text > *:first-child {
+  margin-top: 0;
+}
+
+.sgr-message-text > *:last-child {
+  margin-bottom: 0;
+}
+
+.sgr-message-text p {
+  margin: 0;
+}
+
+.sgr-message-text p:not(:last-child) {
+  margin-bottom: 0.5em;
 }
 
 .sgr-markdown {
   white-space: pre-wrap;
   word-wrap: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* Reset margins for markdown elements */
+.sgr-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.sgr-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.sgr-markdown p {
+  margin: 0.5em 0;
+}
+
+.sgr-markdown h1,
+.sgr-markdown h2,
+.sgr-markdown h3,
+.sgr-markdown h4,
+.sgr-markdown h5,
+.sgr-markdown h6 {
+  margin: 0.8em 0 0.4em 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.sgr-markdown h1 {
+  font-size: 1.5em;
+}
+
+.sgr-markdown h2 {
+  font-size: 1.3em;
+}
+
+.sgr-markdown h3 {
+  font-size: 1.15em;
+}
+
+.sgr-markdown h4,
+.sgr-markdown h5,
+.sgr-markdown h6 {
+  font-size: 1em;
+}
+
+.sgr-markdown ul,
+.sgr-markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.sgr-markdown li {
+  margin: 0.2em 0;
+}
+
+.sgr-markdown blockquote {
+  margin: 0.5em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--background-modifier-border);
+  color: var(--text-muted);
 }
 
 .sgr-markdown code {
@@ -311,6 +467,7 @@
   padding: 10px;
   border-radius: 4px;
   overflow-x: auto;
+  margin: 0.5em 0;
 }
 
 .sgr-markdown pre code {
@@ -329,6 +486,23 @@
 .sgr-markdown a {
   color: var(--link-color);
   text-decoration: underline;
+}
+
+.sgr-markdown table {
+  margin: 0.5em 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.sgr-markdown th,
+.sgr-markdown td {
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sgr-markdown th {
+  background: var(--background-modifier-hover);
+  font-weight: 600;
 }
 
 .sgr-chat-input-container-wrapper {
