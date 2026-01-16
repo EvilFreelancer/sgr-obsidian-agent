@@ -60,8 +60,8 @@ export class AgentView extends ItemView {
       });
       
       button.addEventListener("click", () => {
-        this.app.setting.open();
-        this.app.setting.openTabById(this.plugin.manifest.id);
+        (this.app as any).setting.open();
+        (this.app as any).setting.openTabById(this.plugin.manifest.id);
       });
       
       return;
@@ -76,6 +76,11 @@ export class AgentView extends ItemView {
         apiKey={this.plugin.settings.apiKey}
         proxy={this.plugin.settings.proxy}
         defaultModel={this.plugin.settings.defaultModel}
+        defaultMode={this.plugin.settings.defaultMode}
+        onModeChange={async (mode) => {
+          this.plugin.settings.defaultMode = mode;
+          await this.plugin.saveSettings();
+        }}
       />
     );
   }

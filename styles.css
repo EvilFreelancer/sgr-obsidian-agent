@@ -337,34 +337,33 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.sgr-chat-input-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sgr-chat-input-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sgr-chat-action-button {
+  font-size: 12px;
+  padding: 4px 8px;
 }
 
 .sgr-chat-input-selectors {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
   align-items: center;
-}
-
-.sgr-chat-input-selectors .sgr-select {
-  padding: 4px 12px;
-  font-size: 12px;
-  min-width: 96px;
-  height: 30px;
-  border-radius: 999px;
-  background: var(--background-secondary);
-  border-color: var(--background-modifier-border);
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-}
-
-.sgr-chat-input-selectors .sgr-select:hover:not(:disabled) {
-  background: var(--background-modifier-hover);
-}
-
-.sgr-chat-input-selectors .sgr-select:focus {
-  outline: none;
-  border-color: var(--interactive-accent);
-  box-shadow: 0 0 0 2px var(--background-modifier-border);
 }
 
 .sgr-file-pills {
@@ -404,14 +403,8 @@
   color: var(--text-error);
 }
 
-.sgr-chat-input-wrapper {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-
 .sgr-chat-input {
-  flex: 1;
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
@@ -423,6 +416,7 @@
   overflow-y: auto;
   line-height: 20px;
   min-height: 100px;
+  margin-bottom: 8px;
 }
 
 .sgr-chat-input:focus {
@@ -587,4 +581,118 @@
 .sgr-chat-history-item-actions {
   display: flex;
   gap: 8px;
+}
+
+/* Custom Select Styles */
+.sgr-custom-select {
+  position: relative;
+  display: inline-block;
+}
+
+.sgr-custom-select-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 12px;
+  min-width: 96px;
+  height: 30px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.sgr-custom-select-button:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+}
+
+.sgr-custom-select-button:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border);
+}
+
+.sgr-custom-select-disabled .sgr-custom-select-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sgr-custom-select-button-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.sgr-custom-select-icon {
+  display: flex;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+.sgr-custom-select-label {
+  flex: 1;
+}
+
+.sgr-custom-select-arrow {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.sgr-custom-select-open .sgr-custom-select-arrow {
+  transform: rotate(180deg);
+}
+
+.sgr-custom-select-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.sgr-custom-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sgr-custom-select-option:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sgr-custom-select-option-selected {
+  background: var(--background-modifier-active);
+  color: var(--interactive-accent);
+}
+
+.sgr-custom-select-option-icon {
+  display: flex;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }

@@ -5,8 +5,6 @@ import { ChatMode, CHAT_MODES } from "../constants";
 import { App } from "obsidian";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
-import { ChatControls } from "./ChatControls";
-import { ModelSelector } from "./ModelSelector";
 import { ChatHistory } from "./ChatHistory";
 
 interface ChatProps {
@@ -16,6 +14,8 @@ interface ChatProps {
   apiKey: string;
   proxy?: string;
   defaultModel: string;
+  defaultMode: ChatMode;
+  onModeChange: (mode: ChatMode) => Promise<void>;
 }
 
 export const Chat: React.FC<ChatProps> = ({
@@ -25,8 +25,10 @@ export const Chat: React.FC<ChatProps> = ({
   apiKey,
   proxy,
   defaultModel,
+  defaultMode,
+  onModeChange: onModeChangeSettings,
 }) => {
-  const [mode, setMode] = useState<ChatMode>(CHAT_MODES.ASK);
+  const [mode, setMode] = useState<ChatMode>(defaultMode);
   const [model, setModel] = useState<string>(defaultModel);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
@@ -49,8 +51,9 @@ export const Chat: React.FC<ChatProps> = ({
     if (!session) {
       // Start new session if none exists
       const initialModel = model || defaultModel;
+      const initialMode = mode || defaultMode;
       if (initialModel) {
-        chatManager.startSession(mode, initialModel);
+        chatManager.startSession(initialMode, initialModel);
         updateMessagesFromSession();
       }
     } else {
@@ -75,7 +78,7 @@ export const Chat: React.FC<ChatProps> = ({
   }, [chatManager, mode, model, defaultModel, updateMessagesFromSession]);
 
   // Handle mode change
-  const handleModeChange = useCallback((newMode: ChatMode) => {
+  const handleModeChange = useCallback(async (newMode: ChatMode) => {
     setMode(newMode);
     const currentModel = model || defaultModel;
     if (currentModel) {
@@ -85,7 +88,9 @@ export const Chat: React.FC<ChatProps> = ({
       setStreamingContent("");
       setIsStreaming(false);
     }
-  }, [chatManager, model, defaultModel, updateMessagesFromSession]);
+    // Save mode to settings
+    await onModeChangeSettings(newMode);
+  }, [chatManager, model, defaultModel, updateMessagesFromSession, onModeChangeSettings]);
 
   // Handle model change
   const handleModelChange = useCallback((newModel: string) => {
@@ -186,20 +191,6 @@ export const Chat: React.FC<ChatProps> = ({
 
   return (
     <div className="sgr-chat">
-      <ModelSelector
-        baseUrl={baseUrl}
-        apiKey={apiKey}
-        proxy={proxy}
-        selectedModel={model}
-        onModelChange={handleModelChange}
-      />
-      <ChatControls
-        mode={mode}
-        onModeChange={handleModeChange}
-        onNewChat={handleNewChat}
-        onSaveChat={handleSaveChat}
-        onLoadHistory={() => setShowHistory(true)}
-      />
       <div className="sgr-chat-messages-container">
         <ChatMessages
           messages={messages}
@@ -220,6 +211,9 @@ export const Chat: React.FC<ChatProps> = ({
         proxy={proxy}
         selectedModel={model}
         onModelChange={handleModelChange}
+        onNewChat={handleNewChat}
+        onSaveChat={handleSaveChat}
+        onLoadHistory={() => setShowHistory(true)}
       />
       {showHistory && (
         <div className="sgr-chat-history-overlay" onClick={() => setShowHistory(false)}>

@@ -1,10 +1,13 @@
 import { DEFAULT_SETTINGS } from "../constants";
 
+import { ChatMode } from "../constants";
+
 export interface AgentSettings {
   baseUrl: string;
   apiKey: string;
   proxy?: string;
   defaultModel: string;
+  defaultMode: ChatMode;
   temperature: number;
   maxTokens: number;
   chatHistoryFolder: string;

@@ -1,20 +1,21 @@
 export const VIEW_TYPE = "sgr-agent-chat-view";
 
-export const DEFAULT_SETTINGS = {
-  baseUrl: "",
-  apiKey: "",
-  proxy: "",
-  defaultModel: "",
-  temperature: 0.7,
-  maxTokens: 2000,
-  chatHistoryFolder: "Chat History",
-};
-
 export const CHAT_MODES = {
   AGENT: "agent",
   ASK: "ask",
   PLAN: "plan",
 } as const;
+
+export const DEFAULT_SETTINGS = {
+  baseUrl: "",
+  apiKey: "",
+  proxy: "",
+  defaultModel: "",
+  defaultMode: CHAT_MODES.ASK,
+  temperature: 0.7,
+  maxTokens: 2000,
+  chatHistoryFolder: "Chat History",
+};
 
 export type ChatMode = typeof CHAT_MODES[keyof typeof CHAT_MODES];
 

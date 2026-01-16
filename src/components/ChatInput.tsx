@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FileContext, Model } from "../types";
 import { Button } from "./ui/Button";
-import { Select } from "./ui/Select";
+import { CustomSelect } from "./ui/CustomSelect";
 import { ChatMode, CHAT_MODES } from "../constants";
 import { LLMClient, NetworkError, LLMAPIError } from "../core/LLMClient";
 import { App, TFile } from "obsidian";
@@ -20,6 +20,9 @@ interface ChatInputProps {
   proxy?: string;
   selectedModel: string;
   onModelChange: (model: string) => void;
+  onNewChat: () => void;
+  onSaveChat: () => void;
+  onLoadHistory: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -36,6 +39,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   proxy,
   selectedModel,
   onModelChange,
+  onNewChat,
+  onSaveChat,
+  onLoadHistory,
 }) => {
   const [input, setInput] = useState("");
   const [fileContexts, setFileContexts] = useState<FileContext[]>([]);
@@ -247,10 +253,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  // Icons for modes
+  const modeIcons = {
+    [CHAT_MODES.AGENT]: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm0 1.5c3.03 0 5.5 2.47 5.5 5.5S10.03 12.5 7 12.5 1.5 10.03 1.5 7 3.97 1.5 7 1.5zm0 2.5c-1.38 0-2.5 1.12-2.5 2.5S5.62 9.5 7 9.5 9.5 8.38 9.5 7 8.38 4.5 7 4.5z" />
+      </svg>
+    ),
+    [CHAT_MODES.ASK]: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <path d="M7 0C3.13 0 0 3.13 0 7c0 1.74.72 3.31 1.88 4.44L0 14l2.56-1.88C3.69 13.28 5.26 14 7 14c3.87 0 7-3.13 7-7S10.87 0 7 0zm.5 11h-1v-1h1v1zm0-2.5h-1V5.5h1V8.5z" />
+      </svg>
+    ),
+    [CHAT_MODES.PLAN]: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <path d="M1 2h12v1H1V2zm0 3h12v1H1V5zm0 3h8v1H1V8zm0 3h8v1H1v-1z" />
+      </svg>
+    ),
+  };
+
   const modeOptions = [
-    { value: CHAT_MODES.AGENT, label: "Agent" },
-    { value: CHAT_MODES.ASK, label: "Ask" },
-    { value: CHAT_MODES.PLAN, label: "Plan" },
+    { value: CHAT_MODES.AGENT, label: "Agent", icon: modeIcons[CHAT_MODES.AGENT] },
+    { value: CHAT_MODES.ASK, label: "Ask", icon: modeIcons[CHAT_MODES.ASK] },
+    { value: CHAT_MODES.PLAN, label: "Plan", icon: modeIcons[CHAT_MODES.PLAN] },
   ];
 
   const modelOptions = models.map((model) => ({
@@ -276,49 +301,75 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           ))}
         </div>
       )}
-      <div className="sgr-chat-input-wrapper">
-        <textarea
-          ref={inputRef}
-          className="sgr-chat-input"
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={5}
-        />
-        <Button
-          onClick={isLoading ? (onStop || (() => {})) : handleSend}
-          disabled={isLoading ? false : (disabled || !input.trim())}
-          variant="primary"
-          className="sgr-play-stop-button sgr-play-button-round"
-        >
-          {isLoading ? (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <rect x="4" y="2" width="2" height="12" />
-              <rect x="10" y="2" width="2" height="12" />
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M3 2v12l10-6z" />
-            </svg>
-          )}
-        </Button>
-      </div>
-      <div className="sgr-chat-input-selectors">
-        <Select
-          options={modeOptions}
-          value={mode}
-          onChange={(e) => onModeChange(e.target.value as ChatMode)}
-          className="sgr-mode-select"
-        />
-        <Select
-          options={modelOptions.length > 0 ? modelOptions : [{ value: selectedModel || "", label: selectedModel || "No models" }]}
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={modelsLoading || modelOptions.length === 0}
-          className="sgr-model-select"
-        />
+      <textarea
+        ref={inputRef}
+        className="sgr-chat-input"
+        value={input}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={5}
+      />
+      <div className="sgr-chat-input-bottom">
+        <div className="sgr-chat-input-actions">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onNewChat}
+            className="sgr-chat-action-button"
+          >
+            New Chat
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSaveChat}
+            className="sgr-chat-action-button"
+          >
+            Save
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLoadHistory}
+            className="sgr-chat-action-button"
+          >
+            History
+          </Button>
+        </div>
+        <div className="sgr-chat-input-selectors">
+          <CustomSelect
+            options={modeOptions}
+            value={mode}
+            onChange={(value) => onModeChange(value as ChatMode)}
+            className="sgr-mode-select"
+          />
+          <CustomSelect
+            options={modelOptions.length > 0 ? modelOptions : [{ value: selectedModel || "", label: selectedModel || "No models" }]}
+            value={selectedModel}
+            onChange={onModelChange}
+            disabled={modelsLoading || modelOptions.length === 0}
+            className="sgr-model-select"
+          />
+          <Button
+            onClick={isLoading ? (onStop || (() => {})) : handleSend}
+            disabled={isLoading ? false : (disabled || !input.trim())}
+            variant="primary"
+            className="sgr-play-stop-button sgr-play-button-round"
+          >
+            {isLoading ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="4" y="2" width="2" height="12" />
+                <rect x="10" y="2" width="2" height="12" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3 2v12l10-6z" />
+              </svg>
+            )}
+          </Button>
+        </div>
       </div>
       {showAutocomplete && autocompleteFiles.length > 0 && (
         <div ref={autocompleteRef} className="sgr-autocomplete">
