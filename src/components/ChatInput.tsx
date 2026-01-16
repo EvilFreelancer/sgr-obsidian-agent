@@ -46,6 +46,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [modelsLoading, setModelsLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch models on mount
   useEffect(() => {
@@ -90,9 +91,62 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Initialize textarea height on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      const lineHeight = 20; // Approximate line height
+      inputRef.current.style.height = `${lineHeight * 5}px`;
+    }
+  }, []);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    const resizeTextarea = () => {
+      textarea.style.height = "auto";
+      // Calculate max height based on container or use default
+      const container = containerRef.current;
+      let maxHeight = 400; // Default max height
+      
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        // Use 50% of viewport or container height, whichever is smaller
+        maxHeight = Math.min(viewportHeight * 0.5, containerRect.height * 2);
+      }
+      
+      const lineHeight = 20; // Approximate line height
+      const minHeight = lineHeight * 5; // 5 lines minimum
+      const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight));
+      textarea.style.height = `${newHeight}px`;
+    };
+
+    resizeTextarea();
+  }, [input]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
+
+    // Auto-resize
+    const textarea = e.target;
+    textarea.style.height = "auto";
+    
+    const container = containerRef.current;
+    let maxHeight = 400; // Default max height
+    
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      maxHeight = Math.min(viewportHeight * 0.5, containerRect.height * 2);
+    }
+    
+    const lineHeight = 20; // Approximate line height
+    const minHeight = lineHeight * 5; // 5 lines minimum
+    const newHeight = Math.max(minHeight, Math.min(textarea.scrollHeight, maxHeight));
+    textarea.style.height = `${newHeight}px`;
 
     // Check for @ mention
     const cursorPos = e.target.selectionStart;
@@ -185,6 +239,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       onSend(input.trim(), fileContexts);
       setInput("");
       setFileContexts([]);
+      // Reset textarea height to initial size (5 lines)
+      if (inputRef.current) {
+        const lineHeight = 20; // Approximate line height
+        inputRef.current.style.height = `${lineHeight * 5}px`;
+      }
     }
   };
 
@@ -200,22 +259,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }));
 
   return (
-    <div className="sgr-chat-input-container">
-      <div className="sgr-chat-input-selectors">
-        <Select
-          options={modeOptions}
-          value={mode}
-          onChange={(e) => onModeChange(e.target.value as ChatMode)}
-          className="sgr-mode-select"
-        />
-        <Select
-          options={modelOptions.length > 0 ? modelOptions : [{ value: selectedModel || "", label: selectedModel || "No models" }]}
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={modelsLoading || modelOptions.length === 0}
-          className="sgr-model-select"
-        />
-      </div>
+    <div className="sgr-chat-input-container" ref={containerRef}>
       {fileContexts.length > 0 && (
         <div className="sgr-file-pills">
           {fileContexts.map((fc) => (
@@ -241,7 +285,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          rows={1}
+          rows={5}
         />
         <Button
           onClick={isLoading ? (onStop || (() => {})) : handleSend}
@@ -260,6 +304,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </svg>
           )}
         </Button>
+      </div>
+      <div className="sgr-chat-input-selectors">
+        <Select
+          options={modeOptions}
+          value={mode}
+          onChange={(e) => onModeChange(e.target.value as ChatMode)}
+          className="sgr-mode-select"
+        />
+        <Select
+          options={modelOptions.length > 0 ? modelOptions : [{ value: selectedModel || "", label: selectedModel || "No models" }]}
+          value={selectedModel}
+          onChange={(e) => onModelChange(e.target.value)}
+          disabled={modelsLoading || modelOptions.length === 0}
+          className="sgr-model-select"
+        />
       </div>
       {showAutocomplete && autocompleteFiles.length > 0 && (
         <div ref={autocompleteRef} className="sgr-autocomplete">

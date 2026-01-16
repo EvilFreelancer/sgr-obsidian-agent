@@ -297,6 +297,27 @@ export const Chat: React.FC<ChatProps> = ({
         />
       ) : (
         <>
+          <div className="sgr-chat-top-bar">
+            <button
+              className="sgr-top-bar-button"
+              onClick={handleNewChat}
+              title="New Chat"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 2v12M2 8h12" />
+              </svg>
+            </button>
+            <button
+              className="sgr-top-bar-button"
+              onClick={() => setShowHistory(true)}
+              title="Chat History"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 4v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
           <div className="sgr-chat-messages-container">
             <ChatMessages
               messages={displayMessages}
