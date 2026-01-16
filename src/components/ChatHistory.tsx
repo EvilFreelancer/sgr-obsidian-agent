@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from "react";
 import { MessageRepository } from "../core/MessageRepository";
 import { ChatHistoryMetadata } from "../types";
 import { Button } from "./ui/Button";
@@ -7,7 +7,13 @@ import { bm25Search } from "../utils/bm25Search";
 interface ChatHistoryProps {
   messageRepo: MessageRepository;
   onLoadChat: (filePath: string) => void;
+  onDeleteChat: (filePath: string) => Promise<void>;
   onBack: () => void;
+  refreshKey?: number;
+}
+
+export interface ChatHistoryRef {
+  refresh: () => void;
 }
 
 interface ChatItem {
@@ -15,18 +21,16 @@ interface ChatItem {
   metadata: ChatHistoryMetadata;
 }
 
-export const ChatHistory: React.FC<ChatHistoryProps> = ({
+export const ChatHistory = forwardRef<ChatHistoryRef, ChatHistoryProps>(({
   messageRepo,
   onLoadChat,
+  onDeleteChat,
   onBack,
-}) => {
+  refreshKey,
+}, ref) => {
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
-    loadChats();
-  }, []);
 
   const loadChats = async () => {
     setLoading(true);
@@ -40,6 +44,14 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    refresh: loadChats,
+  }));
+
+  useEffect(() => {
+    loadChats();
+  }, [refreshKey]);
+
   // Filter chats using BM25 search
   const filteredChats = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -51,6 +63,9 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   const handleDelete = async (e: React.MouseEvent, filePath: string) => {
     e.stopPropagation(); // Prevent triggering chat load
     try {
+      // Check if this is the current chat and handle it
+      await onDeleteChat(filePath);
+      // Delete the chat file
       await messageRepo.deleteChat(filePath);
       await loadChats();
     } catch (error) {
@@ -115,4 +130,4 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
       </div>
     </div>
   );
-};
+});

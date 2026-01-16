@@ -37,6 +37,7 @@ export const Chat: React.FC<ChatProps> = ({
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const isStreamingStoppedRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Update messages when session changes
   const updateMessagesFromSession = useCallback(() => {
@@ -252,11 +253,12 @@ export const Chat: React.FC<ChatProps> = ({
           </button>
         </div>
       </div>
-      <div className="sgr-chat-messages-container">
+      <div className="sgr-chat-messages-container" ref={scrollContainerRef}>
         <ChatMessages
           messages={messages}
           streamingContent={streamingContent}
           app={app}
+          scrollContainerRef={scrollContainerRef}
         />
       </div>
       <ChatInput

@@ -2,13 +2,15 @@ import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { VIEW_TYPE_HISTORY } from "../constants";
-import { ChatHistory } from "./ChatHistory";
+import { ChatHistory, ChatHistoryRef } from "./ChatHistory";
 import { MessageRepository } from "../core/MessageRepository";
 import SGRPlugin from "../main";
 
 export class ChatHistoryView extends ItemView {
   plugin: SGRPlugin;
   root: Root | null = null;
+  private refreshKey: number = 0;
+  private chatHistoryRef: React.RefObject<ChatHistoryRef> | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: SGRPlugin) {
     super(leaf);
@@ -52,10 +54,64 @@ export class ChatHistoryView extends ItemView {
       return;
     }
 
+    // Increment refresh key to trigger list refresh
+    this.refreshKey++;
+    this.chatHistoryRef = React.createRef<ChatHistoryRef>();
+    
+    // Refresh list when view becomes active
+    const refreshList = () => {
+      if (this.chatHistoryRef?.current) {
+        this.chatHistoryRef.current.refresh();
+      }
+    };
+
+    // Register workspace event to refresh when view becomes active
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        const activeLeaf = this.app.workspace.getActiveViewOfType(ChatHistoryView);
+        if (activeLeaf === this) {
+          refreshList();
+        }
+      })
+    );
+
+    // Register vault event to refresh when chat files are created/modified
+    const chatHistoryFolder = this.plugin.settings.chatHistoryFolder;
+    const normalizedFolder = chatHistoryFolder.startsWith('/') 
+      ? chatHistoryFolder.slice(1) 
+      : chatHistoryFolder;
+    const folderPath = normalizedFolder.endsWith('/') 
+      ? normalizedFolder 
+      : normalizedFolder + '/';
+    
+    this.registerEvent(
+      this.app.vault.on('create', (file) => {
+        if (file.path.startsWith(folderPath) && file.path.endsWith('.json')) {
+          refreshList();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on('modify', (file) => {
+        if (file.path.startsWith(folderPath) && file.path.endsWith('.json')) {
+          refreshList();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on('delete', (file) => {
+        if (file.path.startsWith(folderPath) && file.path.endsWith('.json')) {
+          refreshList();
+        }
+      })
+    );
+    
     this.root = createRoot(contentEl);
     this.root.render(
       <ChatHistory
+        ref={this.chatHistoryRef}
         messageRepo={messageRepo}
+        refreshKey={this.refreshKey}
         onLoadChat={async (filePath: string) => {
           const chatManager = this.plugin.getChatManager();
           if (chatManager) {
@@ -68,6 +124,23 @@ export class ChatHistoryView extends ItemView {
           await this.plugin.activateView();
           // Update all open AgentView instances to reflect loaded session
           this.plugin.updateViews();
+        }}
+        onDeleteChat={async (filePath: string) => {
+          const chatManager = this.plugin.getChatManager();
+          if (chatManager) {
+            const currentChatFilePath = chatManager.getCurrentChatFilePath();
+            // If deleting current chat, clear session and start new empty one
+            if (currentChatFilePath === filePath) {
+              const mode = this.plugin.settings.defaultMode;
+              const model = this.plugin.settings.defaultModel;
+              chatManager.clearSession();
+              if (model) {
+                chatManager.startSession(mode, model);
+              }
+              // Update views to show new empty chat
+              this.plugin.updateViews();
+            }
+          }
         }}
         onBack={() => {
           this.plugin.activateView();
