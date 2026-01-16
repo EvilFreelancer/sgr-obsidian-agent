@@ -619,14 +619,17 @@
 }
 
 .sgr-file-pill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, var(--text-normal));
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .sgr-file-pill-remove {
@@ -648,6 +651,27 @@
   color: var(--text-error);
 }
 
+.sgr-file-mention {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, var(--text-normal));
+  border: 1px solid var(--interactive-accent-hover, var(--interactive-accent));
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.sgr-file-mention:hover {
+  opacity: 0.8;
+  border-color: var(--interactive-accent-hover, var(--interactive-accent));
+}
+
 .sgr-chat-input {
   width: 100%;
   padding: 8px 12px;
@@ -662,6 +686,66 @@
   line-height: 20px;
   min-height: 100px;
   margin-bottom: 8px;
+}
+
+.sgr-chat-input-contenteditable {
+  min-height: 100px;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.sgr-chat-input-contenteditable:empty:before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.sgr-chat-input-contenteditable:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.sgr-chat-input-contenteditable[contenteditable="false"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sgr-file-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, var(--text-normal));
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 0 2px;
+  vertical-align: middle;
+}
+
+.sgr-file-label-remove {
+  background: none;
+  border: none;
+  color: var(--text-on-accent, var(--text-normal));
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.sgr-file-label-remove:hover {
+  opacity: 0.8;
 }
 
 .sgr-chat-input:focus {

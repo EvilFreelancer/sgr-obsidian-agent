@@ -240,9 +240,12 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, app, classNa
   // Preprocess content: replace file mentions and file blocks with placeholders
   // Use HTML entities to avoid markdown parsing issues
   const preprocessContent = (text: string): string => {
+    // Replace <br> tags with newlines first
+    let processed = text.replace(/<br\s*\/?>/gi, '\n');
+    
     // Remove file context blocks [File: ...] and replace with placeholder
     // Pattern: [File: path]\ncontent\n[/File]
-    let processed = text.replace(/\[File:\s*([^\]]+)\][\s\S]*?\[\/File\]/g, (match, filePath) => {
+    processed = processed.replace(/\[File:\s*([^\]]+)\][\s\S]*?\[\/File\]/g, (match, filePath) => {
       const fileName = filePath.split('/').pop() || filePath;
       // Use HTML entities to avoid markdown parsing
       return `\u0001FILE_BLOCK\u0002${filePath}\u0003FILE_BLOCK\u0001`;
@@ -341,9 +344,6 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, app, classNa
         const mentionSpan = document.createElement('span');
         mentionSpan.className = 'sgr-file-mention';
         mentionSpan.setAttribute('data-file-path', filePath);
-        mentionSpan.style.color = 'var(--link-color)';
-        mentionSpan.style.cursor = 'pointer';
-        mentionSpan.style.textDecoration = 'underline';
         mentionSpan.textContent = `@${fileName}`;
         
         // Add click handler
@@ -643,11 +643,6 @@ const FileMention: React.FC<FileMentionProps> = ({ filePath, fileName, app }) =>
     <span
       className="sgr-file-mention"
       onClick={handleClick}
-      style={{
-        color: 'var(--link-color)',
-        cursor: 'pointer',
-        textDecoration: 'underline',
-      }}
     >
       @{fileName}
     </span>

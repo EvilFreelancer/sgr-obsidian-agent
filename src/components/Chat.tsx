@@ -41,6 +41,7 @@ export const Chat: React.FC<ChatProps> = ({
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [messagesBeforeEdit, setMessagesBeforeEdit] = useState<ChatMessage[] | null>(null);
   const isStreamingStoppedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +135,10 @@ export const Chat: React.FC<ChatProps> = ({
     if (!currentModel) {
       return;
     }
+
+    // Clear editing state when sending message
+    setEditingMessage(null);
+    setMessagesBeforeEdit(null);
 
     // Ensure session exists
     let session = chatManager.getCurrentSession();
@@ -255,6 +260,12 @@ export const Chat: React.FC<ChatProps> = ({
 
   // Handle edit message
   const handleEditMessage = useCallback((messageIndex: number, content: string) => {
+    // Save current messages state before editing
+    const session = chatManager.getCurrentSession();
+    if (session) {
+      setMessagesBeforeEdit([...session.messages]);
+    }
+    
     // Remove all messages after the selected message
     chatManager.removeMessagesAfterIndex(messageIndex);
     updateMessagesFromSession();
@@ -268,6 +279,20 @@ export const Chat: React.FC<ChatProps> = ({
     setStreamingContent("");
     setIsStreaming(false);
   }, [chatManager, updateMessagesFromSession]);
+
+  // Handle cancel edit
+  const handleCancelEdit = useCallback(() => {
+    if (messagesBeforeEdit && chatManager.getCurrentSession()) {
+      // Restore messages from before edit
+      const session = chatManager.getCurrentSession();
+      if (session) {
+        session.messages = [...messagesBeforeEdit];
+        updateMessagesFromSession();
+      }
+    }
+    setEditingMessage(null);
+    setMessagesBeforeEdit(null);
+  }, [messagesBeforeEdit, chatManager, updateMessagesFromSession]);
 
   // Handle initial value set (clear editing state)
   const handleInitialValueSet = useCallback(() => {
@@ -331,6 +356,7 @@ export const Chat: React.FC<ChatProps> = ({
         onModelChange={handleModelChange}
         initialValue={editingMessage || undefined}
         onInitialValueSet={handleInitialValueSet}
+        onCancelEdit={editingMessage ? handleCancelEdit : undefined}
       />
     </div>
   );
