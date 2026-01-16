@@ -32,15 +32,90 @@ export const Chat: React.FC<ChatProps> = ({
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [hasLoadedLastChat, setHasLoadedLastChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Load last chat on mount if no active session exists
   useEffect(() => {
-    if (selectedModel) {
-      chatManager.startSession(mode, selectedModel);
-      setMessages([]);
-      setStreamingContent("");
+    if (hasLoadedLastChat || !selectedModel) {
+      return; // Already loaded or waiting for model selection
     }
-  }, [mode, selectedModel]);
+
+    const loadLastChat = async () => {
+      // Check if there's already an active session
+      const currentSession = chatManager.getCurrentSession();
+      if (currentSession && currentSession.messages.length > 1) {
+        // Session already exists (has more than just system message), don't load last chat
+        setHasLoadedLastChat(true);
+        // Update UI with existing session
+        const displayMessages = currentSession.messages
+          .filter((msg) => msg.role !== "system")
+          .map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+            timestamp: msg.timestamp,
+          }));
+        setMessages(displayMessages);
+        setMode(currentSession.mode);
+        setSelectedModel(currentSession.model);
+        return;
+      }
+
+      // No active session, try to load last chat
+      try {
+        const messageRepo = chatManager.getMessageRepository();
+        const lastChat = await messageRepo.getLastChat();
+        
+        if (lastChat) {
+          // Load the last chat
+          await chatManager.loadSession(lastChat.path);
+          const session = chatManager.getCurrentSession();
+          if (session) {
+            const displayMessages = session.messages
+              .filter((msg) => msg.role !== "system")
+              .map((msg) => ({
+                role: msg.role as "user" | "assistant",
+                content: msg.content,
+                timestamp: msg.timestamp,
+              }));
+            setMessages(displayMessages);
+            setMode(session.mode);
+            setSelectedModel(session.model);
+          }
+          setHasLoadedLastChat(true);
+        } else {
+          // No chat history, start new session
+          chatManager.startSession(mode, selectedModel);
+          setMessages([]);
+          setStreamingContent("");
+          setHasLoadedLastChat(true);
+        }
+      } catch (error) {
+        console.error("Failed to load last chat:", error);
+        // Start new session on error
+        chatManager.startSession(mode, selectedModel);
+        setMessages([]);
+        setStreamingContent("");
+        setHasLoadedLastChat(true);
+      }
+    };
+
+    loadLastChat();
+  }, [selectedModel, hasLoadedLastChat, chatManager, mode]);
+
+  // Handle mode/model changes after initial load
+  useEffect(() => {
+    if (hasLoadedLastChat && selectedModel) {
+      const currentSession = chatManager.getCurrentSession();
+      // Only start new session if user explicitly changed mode or model
+      // and there's no active session with messages
+      if (!currentSession || currentSession.messages.length <= 1) {
+        chatManager.startSession(mode, selectedModel);
+        setMessages([]);
+        setStreamingContent("");
+      }
+    }
+  }, [mode, selectedModel, hasLoadedLastChat, chatManager]);
 
   useEffect(() => {
     scrollToBottom();
@@ -121,7 +196,10 @@ export const Chat: React.FC<ChatProps> = ({
       return;
     }
 
-    const title = prompt("Enter chat title:", `Chat ${new Date().toLocaleString()}`);
+    // Use generated title or prompt for custom title
+    const generatedTitle = chatManager.getSessionTitle();
+    const defaultTitle = generatedTitle || `Chat ${new Date().toLocaleString()}`;
+    const title = prompt("Enter chat title:", defaultTitle);
     if (!title) return;
 
     try {
@@ -162,42 +240,46 @@ export const Chat: React.FC<ChatProps> = ({
 
   return (
     <div className="sgr-chat-container">
-      <div className="sgr-chat-header">
-        <ModelSelector
-          baseUrl={baseUrl}
-          apiKey={apiKey}
-          proxy={proxy}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-        />
-      </div>
-      <ChatControls
-        mode={mode}
-        onModeChange={handleModeChange}
-        onNewChat={handleNewChat}
-        onSaveChat={handleSaveChat}
-        onLoadHistory={() => setShowHistory(true)}
-      />
-      <div className="sgr-chat-messages-container">
-        <ChatMessages
-          messages={displayMessages}
-          streamingContent={streamingContent}
-        />
-        <div ref={messagesEndRef} />
-      </div>
-      <div className="sgr-chat-input-container-wrapper">
-        <ChatInput
-          onSend={handleSend}
-          disabled={isLoading || !selectedModel}
-          app={app}
-        />
-      </div>
-      {showHistory && (
+      {showHistory ? (
         <ChatHistory
           messageRepo={chatManager.getMessageRepository()}
           onLoadChat={handleLoadChat}
           onClose={() => setShowHistory(false)}
         />
+      ) : (
+        <>
+          <div className="sgr-chat-header">
+            <ModelSelector
+              baseUrl={baseUrl}
+              apiKey={apiKey}
+              proxy={proxy}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+            />
+          </div>
+          <ChatControls
+            mode={mode}
+            onModeChange={handleModeChange}
+            onNewChat={handleNewChat}
+            onSaveChat={handleSaveChat}
+            onLoadHistory={() => setShowHistory(true)}
+          />
+          <div className="sgr-chat-messages-container">
+            <ChatMessages
+              messages={displayMessages}
+              streamingContent={streamingContent}
+              app={app}
+            />
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="sgr-chat-input-container-wrapper">
+            <ChatInput
+              onSend={handleSend}
+              disabled={isLoading || !selectedModel}
+              app={app}
+            />
+          </div>
+        </>
       )}
     </div>
   );

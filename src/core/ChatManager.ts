@@ -16,6 +16,7 @@ export class ChatManager {
   private messageRepo: MessageRepository;
   private app: App;
   private currentSession: ChatSession | null = null;
+  private sessionTitle: string | null = null;
 
   constructor(
     messageRepo: MessageRepository,
@@ -44,6 +45,7 @@ export class ChatManager {
       model,
       fileContexts: [],
     };
+    this.sessionTitle = null;
 
     // Add system message
     const systemPrompt = SYSTEM_PROMPTS[mode];
@@ -100,27 +102,44 @@ export class ChatManager {
       throw new Error('No active session');
     }
 
-    // Build context message if files are attached
-    let messageContent = userMessage;
-    if (this.currentSession.fileContexts.length > 0) {
-      const fileContextsText = this.currentSession.fileContexts
-        .map(fc => `[File: ${fc.path}]\n${fc.content}\n[/File]`)
-        .join('\n\n');
-      messageContent = `${fileContextsText}\n\nUser question: ${userMessage}`;
-    }
-
-    // Add user message
+    // Save original user message with @ mentions to session (for display)
     const userMsg: ChatMessage = {
       role: 'user',
-      content: messageContent,
+      content: userMessage, // Keep original message with @ mentions
       timestamp: Date.now(),
     };
     this.currentSession.messages.push(userMsg);
 
+    // Generate title from first user message if not set
+    if (!this.sessionTitle) {
+      this.sessionTitle = this.generateTitleFromMessage(userMessage);
+    }
+
+    // Build messages for API with file contexts (but don't save to session)
     // Get messages for API (including system message)
-    const apiMessages = this.currentSession.messages.filter(
+    let apiMessages = this.currentSession.messages.filter(
       msg => msg.role !== 'system' || msg.content === SYSTEM_PROMPTS[this.currentSession!.mode]
     );
+
+    // If files are attached, modify the last user message for API only
+    if (this.currentSession.fileContexts.length > 0) {
+      const fileContextsText = this.currentSession.fileContexts
+        .map(fc => `[File: ${fc.path}]\n${fc.content}\n[/File]`)
+        .join('\n\n');
+      
+      // Create modified message for API (with file contexts)
+      // but keep original in session
+      apiMessages = apiMessages.map((msg, index) => {
+        // Modify only the last user message (the one we just added)
+        if (msg.role === 'user' && index === apiMessages.length - 1) {
+          return {
+            ...msg,
+            content: `${fileContextsText}\n\n${userMessage}`,
+          };
+        }
+        return msg;
+      });
+    }
 
     try {
       const stream = await this.llmClient.sendMessage(
@@ -166,14 +185,17 @@ export class ChatManager {
     this.currentSession = null;
   }
 
-  async saveSession(title: string): Promise<string> {
+  async saveSession(title?: string): Promise<string> {
     if (!this.currentSession) {
       throw new Error('No active session to save');
     }
 
+    // Use provided title, generated title, or default
+    const finalTitle = title || this.sessionTitle || 'Untitled Chat';
+
     const now = new Date().toISOString();
     const metadata = {
-      title,
+      title: finalTitle,
       createdAt: now,
       lastAccessedAt: now,
       model: this.currentSession.model,
@@ -186,8 +208,24 @@ export class ChatManager {
   async loadSession(filePath: string): Promise<void> {
     const { messages, metadata } = await this.messageRepo.loadChat(filePath);
     
+    // Update lastAccessedAt in the saved file
+    await this.messageRepo.updateLastAccessedAt(filePath);
+    
+    // Restore session title from metadata
+    this.sessionTitle = metadata.title;
+    
+    // Add system message to the session
+    const systemPrompt = SYSTEM_PROMPTS[metadata.mode as ChatMode];
+    const sessionMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+      ...messages,
+    ];
+    
     this.currentSession = {
-      messages,
+      messages: sessionMessages,
       mode: metadata.mode as ChatMode,
       model: metadata.model,
       fileContexts: [],
@@ -196,5 +234,40 @@ export class ChatManager {
 
   getMessageRepository(): MessageRepository {
     return this.messageRepo;
+  }
+
+  getSessionTitle(): string | null {
+    return this.sessionTitle;
+  }
+
+  private generateTitleFromMessage(message: string): string {
+    // Remove markdown links, code blocks, file mentions, etc.
+    let cleanMessage = message
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links
+      .replace(/`([^`]+)`/g, '$1') // Remove inline code
+      .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+      .replace(/@\[\[([^\]]+)\]\]/g, '$1') // Remove file mentions
+      .replace(/\[File: [^\]]+\][\s\S]*?\[\/File\]/g, '') // Remove file context blocks
+      .replace(/User question:\s*/g, '') // Remove "User question:" prefix
+      .trim();
+
+    // Take first sentence or first 60 characters
+    const firstSentence = cleanMessage.split(/[.!?]/)[0];
+    let title = firstSentence || cleanMessage;
+    
+    // Limit length
+    if (title.length > 60) {
+      title = title.substring(0, 57) + '...';
+    }
+    
+    // Remove problematic characters for filenames
+    title = title.replace(/[<>:"/\\|?*]/g, '');
+    
+    // Capitalize first letter
+    if (title.length > 0) {
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+    }
+    
+    return title || 'Untitled Chat';
   }
 }

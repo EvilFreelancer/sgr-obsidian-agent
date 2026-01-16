@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { MessageRepository } from "../core/MessageRepository";
 import { ChatHistoryMetadata } from "../types";
 import { Button } from "./ui/Button";
+import { bm25Search } from "../utils/bm25Search";
 
 interface ChatHistoryProps {
   messageRepo: MessageRepository;
@@ -9,13 +10,19 @@ interface ChatHistoryProps {
   onClose: () => void;
 }
 
+interface ChatItem {
+  path: string;
+  metadata: ChatHistoryMetadata;
+}
+
 export const ChatHistory: React.FC<ChatHistoryProps> = ({
   messageRepo,
   onLoadChat,
   onClose,
 }) => {
-  const [chats, setChats] = useState<Array<{ path: string; metadata: ChatHistoryMetadata }>>([]);
+  const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadChats();
@@ -33,6 +40,14 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
     }
   };
 
+  // Filter chats using BM25 search
+  const filteredChats = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return chats;
+    }
+    return bm25Search(searchQuery, chats, 'title');
+  }, [chats, searchQuery]);
+
   const handleDelete = async (filePath: string) => {
     if (confirm("Are you sure you want to delete this chat?")) {
       try {
@@ -45,53 +60,63 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
   };
 
   return (
-    <div className="sgr-chat-history-overlay" onClick={onClose}>
-      <div className="sgr-chat-history-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="sgr-chat-history-header">
-          <h3>Chat History</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            ×
-          </Button>
-        </div>
-        <div className="sgr-chat-history-list">
-          {loading ? (
-            <div className="sgr-chat-history-loading">Loading...</div>
-          ) : chats.length === 0 ? (
-            <div className="sgr-chat-history-empty">No chat history</div>
-          ) : (
-            chats.map((chat) => (
-              <div key={chat.path} className="sgr-chat-history-item">
-                <div className="sgr-chat-history-item-info">
-                  <div className="sgr-chat-history-item-title">
-                    {chat.metadata.title}
-                  </div>
-                  <div className="sgr-chat-history-item-meta">
-                    {new Date(chat.metadata.lastAccessedAt).toLocaleString()} • {chat.metadata.model} • {chat.metadata.mode}
-                  </div>
+    <div className="sgr-chat-history-view">
+      <div className="sgr-chat-history-header">
+        <h3>Chat History</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          ×
+        </Button>
+      </div>
+      <div className="sgr-chat-history-search">
+        <input
+          type="text"
+          className="sgr-chat-history-search-input"
+          placeholder="Search chats..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
+      <div className="sgr-chat-history-list">
+        {loading ? (
+          <div className="sgr-chat-history-loading">Loading...</div>
+        ) : filteredChats.length === 0 ? (
+          <div className="sgr-chat-history-empty">
+            {searchQuery ? "No chats found" : "No chat history"}
+          </div>
+        ) : (
+          filteredChats.map((chat) => (
+            <div key={chat.path} className="sgr-chat-history-item">
+              <div className="sgr-chat-history-item-info">
+                <div className="sgr-chat-history-item-title">
+                  {chat.metadata.title}
                 </div>
-                <div className="sgr-chat-history-item-actions">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      onLoadChat(chat.path);
-                      onClose();
-                    }}
-                  >
-                    Load
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(chat.path)}
-                  >
-                    Delete
-                  </Button>
+                <div className="sgr-chat-history-item-meta">
+                  {new Date(chat.metadata.lastAccessedAt).toLocaleString()} • {chat.metadata.model} • {chat.metadata.mode}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+              <div className="sgr-chat-history-item-actions">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    onLoadChat(chat.path);
+                    onClose();
+                  }}
+                >
+                  Load
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(chat.path)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -16,25 +16,25 @@ export class MessageRepository {
   ): Promise<string> {
     await this.ensureFolderExists();
 
-    const fileName = `${this.sanitizeFileName(metadata.title)}.md`;
+    const fileName = `${this.sanitizeFileName(metadata.title)}.json`;
     const filePath = `${this.folderPath}/${fileName}`;
 
-    const frontmatter = `---
-title: "${metadata.title}"
-createdAt: "${metadata.createdAt}"
-lastAccessedAt: "${metadata.lastAccessedAt}"
-model: "${metadata.model}"
-mode: "${metadata.mode}"
----
+    // Save in OpenAI protocol format (JSON)
+    const chatData = {
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+      metadata: {
+        title: metadata.title,
+        createdAt: metadata.createdAt,
+        lastAccessedAt: metadata.lastAccessedAt,
+        model: metadata.model,
+        mode: metadata.mode,
+      },
+    };
 
-`;
-
-    let content = frontmatter;
-    for (const message of messages) {
-      if (message.role === 'system') continue;
-      const roleLabel = message.role === 'user' ? 'User' : 'Assistant';
-      content += `## ${roleLabel}\n${message.content}\n\n`;
-    }
+    const content = JSON.stringify(chatData, null, 2);
 
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof TFile) {
@@ -53,51 +53,52 @@ mode: "${metadata.mode}"
     }
 
     const content = await this.app.vault.read(file);
-    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
     
-    if (!frontmatterMatch) {
-      throw new Error('Invalid chat file format: missing frontmatter');
-    }
-
-    const frontmatter = this.parseFrontmatter(frontmatterMatch[1]);
-    const body = content.slice(frontmatterMatch[0].length);
-
-    const messages: ChatMessage[] = [];
-    const sections = body.split(/^## (User|Assistant)\n/gm).filter(Boolean);
-
-    for (let i = 0; i < sections.length; i += 2) {
-      const roleLabel = sections[i];
-      const content = sections[i + 1]?.trim() || '';
+    try {
+      const chatData = JSON.parse(content);
       
-      if (roleLabel === 'User' || roleLabel === 'Assistant') {
-        messages.push({
-          role: roleLabel.toLowerCase() as 'user' | 'assistant',
-          content,
-        });
+      if (!chatData.messages || !Array.isArray(chatData.messages)) {
+        throw new Error('Invalid chat file format: missing messages array');
       }
-    }
+      
+      if (!chatData.metadata) {
+        throw new Error('Invalid chat file format: missing metadata');
+      }
 
-    return {
-      messages,
-      metadata: frontmatter,
-    };
+      const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      }));
+
+      return {
+        messages,
+        metadata: chatData.metadata as ChatHistoryMetadata,
+      };
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error('Invalid chat file format: not valid JSON');
+      }
+      throw error;
+    }
   }
 
   async listChats(): Promise<Array<{ path: string; metadata: ChatHistoryMetadata }>> {
     await this.ensureFolderExists();
 
-    const files = this.app.vault.getMarkdownFiles().filter(
-      file => file.path.startsWith(this.folderPath + '/')
+    const allFiles = this.app.vault.getFiles();
+    const jsonFiles = allFiles.filter(
+      file => file.path.startsWith(this.folderPath + '/') && file.path.endsWith('.json')
     );
 
     const chats = [];
-    for (const file of files) {
+    for (const file of jsonFiles) {
       try {
         const content = await this.app.vault.read(file);
-        const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
-        if (frontmatterMatch) {
-          const metadata = this.parseFrontmatter(frontmatterMatch[1]);
-          chats.push({ path: file.path, metadata });
+        const chatData = JSON.parse(content);
+        
+        if (chatData.metadata) {
+          chats.push({ path: file.path, metadata: chatData.metadata as ChatHistoryMetadata });
         }
       } catch (e) {
         // Skip invalid files
@@ -110,10 +111,43 @@ mode: "${metadata.mode}"
     );
   }
 
+  async getLastChat(): Promise<{ path: string; metadata: ChatHistoryMetadata } | null> {
+    const chats = await this.listChats();
+    return chats.length > 0 ? chats[0] : null;
+  }
+
   async deleteChat(filePath: string): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (file instanceof TFile) {
       await this.app.vault.delete(file);
+    }
+  }
+
+  async updateLastAccessedAt(filePath: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!(file instanceof TFile)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    const content = await this.app.vault.read(file);
+    
+    try {
+      const chatData = JSON.parse(content);
+      
+      if (!chatData.metadata) {
+        throw new Error('Invalid chat file format: missing metadata');
+      }
+
+      // Update lastAccessedAt
+      chatData.metadata.lastAccessedAt = new Date().toISOString();
+
+      const updatedContent = JSON.stringify(chatData, null, 2);
+      await this.app.vault.modify(file, updatedContent);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error('Invalid chat file format: not valid JSON');
+      }
+      throw error;
     }
   }
 
@@ -124,18 +158,6 @@ mode: "${metadata.mode}"
     }
   }
 
-  private parseFrontmatter(frontmatter: string): ChatHistoryMetadata {
-    const metadata: any = {};
-    for (const line of frontmatter.split('\n')) {
-      const match = line.match(/^(\w+):\s*(.+)$/);
-      if (match) {
-        const key = match[1];
-        const value = match[2].replace(/^["']|["']$/g, '');
-        metadata[key] = value;
-      }
-    }
-    return metadata as ChatHistoryMetadata;
-  }
 
   private sanitizeFileName(name: string): string {
     return name
