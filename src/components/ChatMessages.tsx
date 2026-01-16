@@ -9,6 +9,7 @@ interface ChatMessagesProps {
   streamingContent?: string;
   app: App;
   scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  onEditMessage?: (messageIndex: number, content: string) => void;
 }
 
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -16,6 +17,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   streamingContent,
   app,
   scrollContainerRef,
+  onEditMessage,
 }) => {
   const displayMessages = messages.filter((msg) => msg.role !== "system");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -192,9 +194,6 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           key={index}
           className={`sgr-message sgr-message-${message.role}`}
         >
-          <div className="sgr-message-header">
-            <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
-          </div>
           <div className="sgr-message-content">
             <MarkdownContent
               content={message.content}
@@ -202,14 +201,18 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               className={message.role === "assistant" ? "sgr-markdown" : "sgr-message-text"}
             />
           </div>
-          <CopyButton content={message.content} />
+          <div className="sgr-message-actions">
+            <CopyButton content={message.content} />
+            {message.role === "user" && onEditMessage && (
+              <EditButton
+                onClick={() => onEditMessage(index, message.content)}
+              />
+            )}
+          </div>
         </div>
       ))}
       {shouldShowStreaming && (
         <div className="sgr-message sgr-message-assistant sgr-message-streaming">
-          <div className="sgr-message-header">
-            <strong>Assistant</strong>
-          </div>
           <div className="sgr-message-content">
             <MarkdownContent
               content={streamingContent}
@@ -648,6 +651,41 @@ const FileMention: React.FC<FileMentionProps> = ({ filePath, fileName, app }) =>
     >
       @{fileName}
     </span>
+  );
+};
+
+// Component for editing user message
+interface EditButtonProps {
+  onClick: () => void;
+}
+
+const EditButton: React.FC<EditButtonProps> = ({ onClick }) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  };
+
+  return (
+    <button
+      className="sgr-edit-button"
+      onClick={handleClick}
+      title="Edit"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+      </svg>
+    </button>
   );
 };
 

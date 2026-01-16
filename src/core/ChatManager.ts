@@ -219,6 +219,22 @@ export class ChatManager {
     return this.currentSession;
   }
 
+  removeMessagesAfterIndex(messageIndex: number): void {
+    if (!this.currentSession) {
+      return;
+    }
+
+    // Find the actual index in messages array (accounting for system message)
+    // messageIndex is the index in displayMessages (without system), so we need to add 1
+    const actualIndex = messageIndex + 1; // +1 for system message
+    
+    // Keep system message and messages up to and including the selected message
+    this.currentSession.messages = this.currentSession.messages.slice(0, actualIndex + 1);
+    
+    // Clear file contexts when editing (user can re-add them if needed)
+    this.currentSession.fileContexts = [];
+  }
+
   clearSession(): void {
     this.currentSession = null;
     this.sessionTimestamp = null;

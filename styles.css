@@ -266,18 +266,20 @@
 
 .sgr-message-user {
   align-self: flex-end;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
   max-width: 80%;
+  padding: 0;
+  gap: 4px;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 /* Text selection styles for user messages */
-.sgr-message-user ::selection {
+.sgr-message-user .sgr-message-content ::selection {
   background: rgba(255, 255, 255, 0.3);
   color: var(--text-on-accent);
 }
 
-.sgr-message-user ::-moz-selection {
+.sgr-message-user .sgr-message-content ::-moz-selection {
   background: rgba(255, 255, 255, 0.3);
   color: var(--text-on-accent);
 }
@@ -308,9 +310,52 @@
   -ms-user-select: text;
 }
 
-.sgr-copy-button {
+.sgr-message-user .sgr-message-content {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: 12px;
+  border-radius: 8px;
+  flex: 0 1 auto;
+}
+
+.sgr-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   align-self: flex-start;
   margin-top: 4px;
+}
+
+.sgr-edit-button {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  flex-shrink: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.sgr-edit-button:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: none;
+}
+
+.sgr-edit-button:active {
+  opacity: 0.8;
+  background: none;
+}
+
+.sgr-copy-button {
   padding: 0;
   background: none;
   border: none;
@@ -351,13 +396,7 @@
 }
 
 .sgr-message-user .sgr-copy-button {
-  color: rgba(255, 255, 255, 0.9) !important;
-  opacity: 1 !important;
-}
-
-.sgr-message-user .sgr-copy-button:hover {
-  color: rgba(255, 255, 255, 1) !important;
-  opacity: 1 !important;
+  align-self: flex-end;
 }
 
 .sgr-message-text {

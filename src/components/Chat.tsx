@@ -40,6 +40,7 @@ export const Chat: React.FC<ChatProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const isStreamingStoppedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -252,6 +253,27 @@ export const Chat: React.FC<ChatProps> = ({
     }
   }, [chatManager, updateMessagesFromSession]);
 
+  // Handle edit message
+  const handleEditMessage = useCallback((messageIndex: number, content: string) => {
+    // Remove all messages after the selected message
+    chatManager.removeMessagesAfterIndex(messageIndex);
+    updateMessagesFromSession();
+    
+    // Clean content from file blocks (keep only @ mentions)
+    // Remove [File: path]...[/File] blocks
+    const cleanedContent = content.replace(/\[File:\s*[^\]]+\][\s\S]*?\[\/File\]/g, '').trim();
+    
+    // Set message content in input
+    setEditingMessage(cleanedContent);
+    setStreamingContent("");
+    setIsStreaming(false);
+  }, [chatManager, updateMessagesFromSession]);
+
+  // Handle initial value set (clear editing state)
+  const handleInitialValueSet = useCallback(() => {
+    setEditingMessage(null);
+  }, []);
+
 
   return (
     <div className="sgr-chat">
@@ -291,6 +313,7 @@ export const Chat: React.FC<ChatProps> = ({
           streamingContent={streamingContent}
           app={app}
           scrollContainerRef={scrollContainerRef}
+          onEditMessage={handleEditMessage}
         />
       </div>
       <ChatInput
@@ -306,6 +329,8 @@ export const Chat: React.FC<ChatProps> = ({
         proxy={proxy}
         selectedModel={model}
         onModelChange={handleModelChange}
+        initialValue={editingMessage || undefined}
+        onInitialValueSet={handleInitialValueSet}
       />
     </div>
   );

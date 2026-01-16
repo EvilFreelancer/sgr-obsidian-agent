@@ -20,6 +20,8 @@ interface ChatInputProps {
   proxy?: string;
   selectedModel: string;
   onModelChange: (model: string) => void;
+  initialValue?: string;
+  onInitialValueSet?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -36,6 +38,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   proxy,
   selectedModel,
   onModelChange,
+  initialValue,
+  onInitialValueSet,
 }) => {
   const [input, setInput] = useState("");
   const [fileContexts, setFileContexts] = useState<FileContext[]>([]);
@@ -98,6 +102,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       inputRef.current.style.height = `${lineHeight * 5}px`;
     }
   }, []);
+
+  // Handle initial value from parent (for editing messages)
+  useEffect(() => {
+    if (initialValue !== undefined && initialValue !== input) {
+      setInput(initialValue);
+      // Clear file contexts when editing (user can re-add them via @ mentions)
+      setFileContexts([]);
+      if (onInitialValueSet) {
+        onInitialValueSet();
+      }
+      // Focus input when value is set
+      if (inputRef.current) {
+        inputRef.current.focus();
+        // Move cursor to end
+        const length = initialValue.length;
+        inputRef.current.setSelectionRange(length, length);
+      }
+    }
+  }, [initialValue, onInitialValueSet]);
 
   // Auto-resize textarea
   useEffect(() => {
