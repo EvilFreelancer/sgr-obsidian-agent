@@ -17,5 +17,5 @@
     "lib": ["DOM", "DOM.Iterable", "ES5", "ES6", "ES7", "ES2022", "ESNext"]
   },
   "include": ["**/*.ts", "src", "src/**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/__tests__"]
 }

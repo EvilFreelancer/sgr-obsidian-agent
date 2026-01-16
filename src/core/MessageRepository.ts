@@ -1,6 +1,13 @@
 import { App, TFile } from "obsidian";
 import { ChatMessage, ChatHistoryMetadata } from "../types";
 
+export interface ChatHistoryData {
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ChatMessage[];
+}
+
 export class MessageRepository {
   private app: App;
   private folderPath: string;
@@ -46,6 +53,57 @@ export class MessageRepository {
     return filePath;
   }
 
+  async saveChatWithTimestamp(
+    messages: ChatMessage[],
+    timestamp: number,
+    title: string = "New Chat",
+    model: string = "",
+    mode: string = ""
+  ): Promise<string> {
+    await this.ensureFolderExists();
+
+    const fileName = `${timestamp}.json`;
+    const filePath = `${this.folderPath}/${fileName}`;
+
+    const now = new Date().toISOString();
+    
+    // Check if file already exists to preserve created_at
+    let created_at = now;
+    const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+    if (existingFile instanceof TFile) {
+      try {
+        const existingContent = await this.app.vault.read(existingFile);
+        const existingData = JSON.parse(existingContent) as ChatHistoryData;
+        if (existingData.created_at) {
+          created_at = existingData.created_at;
+        }
+      } catch (e) {
+        // If we can't read existing file, use current time
+      }
+    }
+
+    const chatData: ChatHistoryData = {
+      title,
+      created_at,
+      updated_at: now,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      })),
+    };
+
+    const content = JSON.stringify(chatData, null, 2);
+
+    if (existingFile instanceof TFile) {
+      await this.app.vault.modify(existingFile, content);
+    } else {
+      await this.app.vault.create(filePath, content);
+    }
+
+    return filePath;
+  }
+
   async loadChat(filePath: string): Promise<{ messages: ChatMessage[]; metadata: ChatHistoryMetadata }> {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (!(file instanceof TFile)) {
@@ -57,24 +115,63 @@ export class MessageRepository {
     try {
       const chatData = JSON.parse(content);
       
-      if (!chatData.messages || !Array.isArray(chatData.messages)) {
-        throw new Error('Invalid chat file format: missing messages array');
-      }
-      
-      if (!chatData.metadata) {
-        throw new Error('Invalid chat file format: missing metadata');
-      }
+      // Support both old format (with metadata) and new format (with title, created_at, updated_at)
+      if (chatData.metadata) {
+        // Old format
+        if (!chatData.messages || !Array.isArray(chatData.messages)) {
+          throw new Error('Invalid chat file format: missing messages array');
+        }
 
-      const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-      }));
+        const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }));
 
-      return {
-        messages,
-        metadata: chatData.metadata as ChatHistoryMetadata,
-      };
+        return {
+          messages,
+          metadata: chatData.metadata as ChatHistoryMetadata,
+        };
+      } else if (chatData.title !== undefined && chatData.created_at !== undefined) {
+        // New format
+        if (!chatData.messages || !Array.isArray(chatData.messages)) {
+          throw new Error('Invalid chat file format: missing messages array');
+        }
+
+        const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }));
+
+        // Extract model and mode from filename or use defaults
+        const fileName = file.basename;
+        const timestamp = parseInt(fileName.replace('.json', ''));
+        
+        // Try to get model and mode from messages (system message might have hints)
+        let model = '';
+        let mode = '';
+        
+        // Try to find in existing metadata if file was migrated
+        // For now, use defaults - these will be set when saving
+        model = chatData.model || '';
+        mode = chatData.mode || '';
+
+        const metadata: ChatHistoryMetadata = {
+          title: chatData.title || 'New Chat',
+          createdAt: chatData.created_at,
+          lastAccessedAt: chatData.updated_at || chatData.created_at,
+          model,
+          mode,
+        };
+
+        return {
+          messages,
+          metadata,
+        };
+      } else {
+        throw new Error('Invalid chat file format: unknown format');
+      }
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new Error('Invalid chat file format: not valid JSON');
@@ -98,7 +195,18 @@ export class MessageRepository {
         const chatData = JSON.parse(content);
         
         if (chatData.metadata) {
+          // Old format
           chats.push({ path: file.path, metadata: chatData.metadata as ChatHistoryMetadata });
+        } else if (chatData.title !== undefined && chatData.created_at !== undefined) {
+          // New format
+          const metadata: ChatHistoryMetadata = {
+            title: chatData.title || 'New Chat',
+            createdAt: chatData.created_at,
+            lastAccessedAt: chatData.updated_at || chatData.created_at,
+            model: chatData.model || '',
+            mode: chatData.mode || '',
+          };
+          chats.push({ path: file.path, metadata });
         }
       } catch (e) {
         // Skip invalid files
@@ -134,12 +242,15 @@ export class MessageRepository {
     try {
       const chatData = JSON.parse(content);
       
-      if (!chatData.metadata) {
-        throw new Error('Invalid chat file format: missing metadata');
+      if (chatData.metadata) {
+        // Old format
+        chatData.metadata.lastAccessedAt = new Date().toISOString();
+      } else if (chatData.title !== undefined && chatData.created_at !== undefined) {
+        // New format
+        chatData.updated_at = new Date().toISOString();
+      } else {
+        throw new Error('Invalid chat file format: unknown format');
       }
-
-      // Update lastAccessedAt
-      chatData.metadata.lastAccessedAt = new Date().toISOString();
 
       const updatedContent = JSON.stringify(chatData, null, 2);
       await this.app.vault.modify(file, updatedContent);
@@ -149,6 +260,19 @@ export class MessageRepository {
       }
       throw error;
     }
+  }
+
+  getTimestampFromPath(filePath: string): number | null {
+    const fileName = filePath.split('/').pop();
+    if (!fileName || !fileName.endsWith('.json')) {
+      return null;
+    }
+    const timestampStr = fileName.replace('.json', '');
+    const timestamp = parseInt(timestampStr);
+    if (isNaN(timestamp)) {
+      return null;
+    }
+    return timestamp;
   }
 
   private async ensureFolderExists(): Promise<void> {

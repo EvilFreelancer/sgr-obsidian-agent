@@ -142,6 +142,30 @@
   font-size: 16px;
 }
 
+.sgr-play-stop-button {
+  min-width: 36px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sgr-play-stop-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sgr-play-button-round {
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sgr-chat-messages-container {
   flex: 1;
   overflow-y: auto;
@@ -249,6 +273,21 @@
 
 .sgr-chat-input-container {
   position: relative;
+}
+
+.sgr-chat-input-selectors {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.sgr-mode-select,
+.sgr-model-select {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-width: 80px;
+  height: 28px;
 }
 
 .sgr-file-pills {

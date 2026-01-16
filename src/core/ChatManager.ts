@@ -17,6 +17,7 @@ export class ChatManager {
   private app: App;
   private currentSession: ChatSession | null = null;
   private sessionTitle: string | null = null;
+  private sessionTimestamp: number | null = null;
 
   constructor(
     messageRepo: MessageRepository,
@@ -46,6 +47,7 @@ export class ChatManager {
       fileContexts: [],
     };
     this.sessionTitle = null;
+    this.sessionTimestamp = Date.now();
 
     // Add system message
     const systemPrompt = SYSTEM_PROMPTS[mode];
@@ -183,6 +185,27 @@ export class ChatManager {
 
   clearSession(): void {
     this.currentSession = null;
+    this.sessionTimestamp = null;
+  }
+
+  async autoSaveSession(): Promise<string | null> {
+    if (!this.currentSession) {
+      return null;
+    }
+
+    if (!this.sessionTimestamp) {
+      this.sessionTimestamp = Date.now();
+    }
+
+    const title = this.sessionTitle || 'New Chat';
+    
+    return await this.messageRepo.saveChatWithTimestamp(
+      this.currentSession.messages,
+      this.sessionTimestamp,
+      title,
+      this.currentSession.model,
+      this.currentSession.mode
+    );
   }
 
   async saveSession(title?: string): Promise<string> {
@@ -213,6 +236,13 @@ export class ChatManager {
     
     // Restore session title from metadata
     this.sessionTitle = metadata.title;
+    
+    // Extract timestamp from file path
+    this.sessionTimestamp = this.messageRepo.getTimestampFromPath(filePath);
+    if (!this.sessionTimestamp) {
+      // If we can't extract timestamp, use current time
+      this.sessionTimestamp = Date.now();
+    }
     
     // Add system message to the session
     const systemPrompt = SYSTEM_PROMPTS[metadata.mode as ChatMode];

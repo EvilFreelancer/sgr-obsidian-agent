@@ -1,28 +1,78 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FileContext } from "../types";
+import { FileContext, Model } from "../types";
 import { Button } from "./ui/Button";
+import { Select } from "./ui/Select";
+import { ChatMode, CHAT_MODES } from "../constants";
+import { LLMClient, NetworkError, LLMAPIError } from "../core/LLMClient";
 import { App, TFile } from "obsidian";
 
 interface ChatInputProps {
   onSend: (message: string, files: FileContext[]) => void;
+  onStop?: () => void;
   disabled?: boolean;
+  isLoading?: boolean;
   placeholder?: string;
   app: App;
+  mode: ChatMode;
+  onModeChange: (mode: ChatMode) => void;
+  baseUrl: string;
+  apiKey: string;
+  proxy?: string;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
+  onStop,
   disabled = false,
+  isLoading = false,
   placeholder = "Type a message...",
   app,
+  mode,
+  onModeChange,
+  baseUrl,
+  apiKey,
+  proxy,
+  selectedModel,
+  onModelChange,
 }) => {
   const [input, setInput] = useState("");
   const [fileContexts, setFileContexts] = useState<FileContext[]>([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteFiles, setAutocompleteFiles] = useState<TFile[]>([]);
   const [autocompleteIndex, setAutocompleteIndex] = useState(-1);
+  const [models, setModels] = useState<Model[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+
+  // Fetch models on mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (!baseUrl || !apiKey) {
+        return;
+      }
+
+      setModelsLoading(true);
+      try {
+        const client = new LLMClient(baseUrl, apiKey, proxy);
+        const fetchedModels = await client.fetchModels();
+        setModels(fetchedModels);
+        
+        if (fetchedModels.length > 0 && !selectedModel) {
+          onModelChange(fetchedModels[0].id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch models:", err);
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    fetchModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseUrl, apiKey, proxy]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -138,8 +188,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const modeOptions = [
+    { value: CHAT_MODES.AGENT, label: "Agent" },
+    { value: CHAT_MODES.ASK, label: "Ask" },
+    { value: CHAT_MODES.PLAN, label: "Plan" },
+  ];
+
+  const modelOptions = models.map((model) => ({
+    value: model.id,
+    label: model.name || model.id,
+  }));
+
   return (
     <div className="sgr-chat-input-container">
+      <div className="sgr-chat-input-selectors">
+        <Select
+          options={modeOptions}
+          value={mode}
+          onChange={(e) => onModeChange(e.target.value as ChatMode)}
+          className="sgr-mode-select"
+        />
+        <Select
+          options={modelOptions.length > 0 ? modelOptions : [{ value: selectedModel || "", label: selectedModel || "No models" }]}
+          value={selectedModel}
+          onChange={(e) => onModelChange(e.target.value)}
+          disabled={modelsLoading || modelOptions.length === 0}
+          className="sgr-model-select"
+        />
+      </div>
       {fileContexts.length > 0 && (
         <div className="sgr-file-pills">
           {fileContexts.map((fc) => (
@@ -168,11 +244,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           rows={1}
         />
         <Button
-          onClick={handleSend}
-          disabled={disabled || !input.trim()}
+          onClick={isLoading ? (onStop || (() => {})) : handleSend}
+          disabled={isLoading ? false : (disabled || !input.trim())}
           variant="primary"
+          className="sgr-play-stop-button sgr-play-button-round"
         >
-          Send
+          {isLoading ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="4" y="2" width="2" height="12" />
+              <rect x="10" y="2" width="2" height="12" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3 2v12l10-6z" />
+            </svg>
+          )}
         </Button>
       </div>
       {showAutocomplete && autocompleteFiles.length > 0 && (

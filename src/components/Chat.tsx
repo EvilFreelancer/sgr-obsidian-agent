@@ -4,8 +4,6 @@ import { ChatMode, CHAT_MODES } from "../constants";
 import { FileContext, ChatMessage } from "../types";
 import { ChatInput } from "./ChatInput";
 import { ChatMessages } from "./ChatMessages";
-import { ChatControls } from "./ChatControls";
-import { ModelSelector } from "./ModelSelector";
 import { ChatHistory } from "./ChatHistory";
 import { App, Notice } from "obsidian";
 
@@ -26,13 +24,14 @@ export const Chat: React.FC<ChatProps> = ({
   proxy,
   defaultModel,
 }) => {
-  const [mode, setMode] = useState<ChatMode>(CHAT_MODES.ASK);
+  const [mode, setMode] = useState<ChatMode>(CHAT_MODES.AGENT);
   const [selectedModel, setSelectedModel] = useState<string>(defaultModel);
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string; timestamp?: number }>>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [hasLoadedLastChat, setHasLoadedLastChat] = useState(false);
+  const streamCancelledRef = useRef<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load last chat on mount if no active session exists
@@ -146,17 +145,68 @@ export const Chat: React.FC<ChatProps> = ({
     setIsLoading(true);
     setStreamingContent("");
 
+    // Auto-save after user message is added
     try {
+      await chatManager.autoSaveSession();
+    } catch (error) {
+      console.error("Failed to auto-save chat:", error);
+    }
+
+    try {
+      streamCancelledRef.current = false;
       const stream = await chatManager.sendMessage(message);
       let fullContent = "";
 
       for await (const chunk of stream) {
+        if (streamCancelledRef.current) {
+          break;
+        }
         fullContent += chunk;
         setStreamingContent(fullContent);
       }
 
-      // Finalize message
-      chatManager.appendAssistantMessage(fullContent);
+      // Finalize message if not cancelled
+      if (!streamCancelledRef.current && fullContent) {
+        chatManager.appendAssistantMessage(fullContent);
+        
+        // Auto-save after assistant response
+        try {
+          await chatManager.autoSaveSession();
+        } catch (error) {
+          console.error("Failed to auto-save chat:", error);
+        }
+
+        const session = chatManager.getCurrentSession();
+        if (session) {
+          const displayMessages = session.messages
+            .filter((msg) => msg.role !== "system")
+            .map((msg) => ({
+              role: msg.role as "user" | "assistant",
+              content: msg.content,
+              timestamp: msg.timestamp,
+            }));
+          setMessages(displayMessages);
+        }
+      }
+      setStreamingContent("");
+    } catch (error: any) {
+      if (!streamCancelledRef.current) {
+        new Notice(`Error: ${error.message || "Failed to send message"}`);
+        console.error("Error sending message:", error);
+      }
+    } finally {
+      setIsLoading(false);
+      streamCancelledRef.current = false;
+    }
+  };
+
+  const handleStop = () => {
+    if (isLoading) {
+      streamCancelledRef.current = true;
+      setIsLoading(false);
+      setStreamingContent("");
+      
+      // Save current state
       const session = chatManager.getCurrentSession();
       if (session) {
         const displayMessages = session.messages
@@ -168,12 +218,11 @@ export const Chat: React.FC<ChatProps> = ({
           }));
         setMessages(displayMessages);
       }
-      setStreamingContent("");
-    } catch (error: any) {
-      new Notice(`Error: ${error.message || "Failed to send message"}`);
-      console.error("Error sending message:", error);
-    } finally {
-      setIsLoading(false);
+      
+      // Auto-save after stopping
+      chatManager.autoSaveSession().catch((error) => {
+        console.error("Failed to auto-save chat:", error);
+      });
     }
   };
 
@@ -248,22 +297,6 @@ export const Chat: React.FC<ChatProps> = ({
         />
       ) : (
         <>
-          <div className="sgr-chat-header">
-            <ModelSelector
-              baseUrl={baseUrl}
-              apiKey={apiKey}
-              proxy={proxy}
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
-            />
-          </div>
-          <ChatControls
-            mode={mode}
-            onModeChange={handleModeChange}
-            onNewChat={handleNewChat}
-            onSaveChat={handleSaveChat}
-            onLoadHistory={() => setShowHistory(true)}
-          />
           <div className="sgr-chat-messages-container">
             <ChatMessages
               messages={displayMessages}
@@ -275,8 +308,17 @@ export const Chat: React.FC<ChatProps> = ({
           <div className="sgr-chat-input-container-wrapper">
             <ChatInput
               onSend={handleSend}
-              disabled={isLoading || !selectedModel}
+              onStop={handleStop}
+              disabled={!selectedModel}
+              isLoading={isLoading}
               app={app}
+              mode={mode}
+              onModeChange={handleModeChange}
+              baseUrl={baseUrl}
+              apiKey={apiKey}
+              proxy={proxy}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
             />
           </div>
         </>
