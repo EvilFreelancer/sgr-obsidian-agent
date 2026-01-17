@@ -31,6 +31,4 @@ export interface ChatHistoryMetadata {
   title: string;
   createdAt: string;
   lastAccessedAt: string;
-  model: string;
-  mode: string;
 }

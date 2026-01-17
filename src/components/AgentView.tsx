@@ -76,8 +76,7 @@ export class AgentView extends ItemView {
         if (file) {
           // Load the last chat
           const mode = this.plugin.settings.defaultMode;
-          const model = this.plugin.settings.defaultModel;
-          await chatManager.loadSession(lastChatPath, mode, model);
+          await chatManager.loadSession(lastChatPath, mode);
         } else {
           // File doesn't exist, clear lastChatPath
           this.plugin.settings.lastChatPath = undefined;
@@ -103,6 +102,10 @@ export class AgentView extends ItemView {
         defaultMode={this.plugin.settings.defaultMode}
         onModeChange={async (mode) => {
           this.plugin.settings.defaultMode = mode;
+          await this.plugin.saveSettings();
+        }}
+        onModelChange={async (model) => {
+          this.plugin.settings.defaultModel = model;
           await this.plugin.saveSettings();
         }}
         onOpenSettings={() => {

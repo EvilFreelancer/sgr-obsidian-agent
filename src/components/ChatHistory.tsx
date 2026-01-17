@@ -113,7 +113,7 @@ export const ChatHistory: React.FC<ChatHistoryProps> = ({
                   {chat.metadata.title}
                 </div>
                 <div className="sgr-chat-history-item-meta">
-                  {new Date(chat.metadata.lastAccessedAt).toLocaleString()} • {chat.metadata.model} • {chat.metadata.mode}
+                  {new Date(chat.metadata.lastAccessedAt).toLocaleString()}
                 </div>
               </div>
               <button

@@ -15,6 +15,7 @@ interface ChatProps {
   defaultModel: string;
   defaultMode: ChatMode;
   onModeChange: (mode: ChatMode) => Promise<void>;
+  onModelChange: (model: string) => Promise<void>;
   onOpenSettings: () => void;
   onOpenHistory: () => void;
   onNewChat?: () => Promise<void>;
@@ -30,6 +31,7 @@ export const Chat: React.FC<ChatProps> = ({
   defaultModel,
   defaultMode,
   onModeChange: onModeChangeSettings,
+  onModelChange: onModelChangeSettings,
   onOpenSettings,
   onOpenHistory,
   onNewChat,
@@ -69,8 +71,6 @@ export const Chat: React.FC<ChatProps> = ({
     } else {
       // Update state from existing session
       updateMessagesFromSession();
-      setMode(session.mode);
-      setModel(session.model);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -98,7 +98,7 @@ export const Chat: React.FC<ChatProps> = ({
     // Update mode in current session without clearing it
     const session = chatManager.getCurrentSession();
     if (session) {
-      // Update mode in existing session
+      // Update mode in existing session (update system message)
       chatManager.updateMode(newMode);
       updateMessagesFromSession();
     } else {
@@ -118,16 +118,13 @@ export const Chat: React.FC<ChatProps> = ({
   }, [chatManager, model, defaultModel, updateMessagesFromSession, onModeChangeSettings]);
 
   // Handle model change
-  const handleModelChange = useCallback((newModel: string) => {
+  const handleModelChange = useCallback(async (newModel: string) => {
     setModel(newModel);
-    const session = chatManager.getCurrentSession();
-    if (session) {
-      // Update session with new model
-      chatManager.clearSession();
-      chatManager.startSession(session.mode, newModel);
-      updateMessagesFromSession();
-    }
-  }, [chatManager, updateMessagesFromSession]);
+    // Model is global setting, no need to clear session
+    // Just update the state, session will use new model on next message
+    // Save model to settings
+    await onModelChangeSettings(newModel);
+  }, [onModelChangeSettings]);
 
   // Handle send message
   const handleSend = useCallback(async (message: string, files: FileContext[]) => {
@@ -168,7 +165,7 @@ export const Chat: React.FC<ChatProps> = ({
     const updateInterval = 500; // Update file every 500ms
 
     try {
-      const stream = await chatManager.sendMessage(message);
+      const stream = await chatManager.sendMessage(message, currentModel, mode);
       
       // Process stream - accumulate content in streamingContent
       // ChatManager already updates session via appendAssistantMessage

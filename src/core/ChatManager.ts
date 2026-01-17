@@ -1,13 +1,11 @@
 import { LLMClient, NetworkError, LLMAPIError, InvalidModelError, RateLimitError } from "./LLMClient";
 import { MessageRepository } from "./MessageRepository";
-import { ChatMessage, FileContext } from "../types";
+import { ChatMessage, FileContext, ChatHistoryMetadata } from "../types";
 import { ChatMode, SYSTEM_PROMPTS } from "../constants";
 import { App, TFile } from "obsidian";
 
 export interface ChatSession {
   messages: ChatMessage[];
-  mode: ChatMode;
-  model: string;
   fileContexts: FileContext[];
 }
 
@@ -43,8 +41,6 @@ export class ChatManager {
   startSession(mode: ChatMode, model: string): void {
     this.currentSession = {
       messages: [],
-      mode,
-      model,
       fileContexts: [],
     };
     this.sessionTitle = null;
@@ -63,9 +59,6 @@ export class ChatManager {
     if (!this.currentSession) {
       return;
     }
-
-    // Update mode in session
-    this.currentSession.mode = newMode;
 
     // Update system message (first message should be system)
     const systemPrompt = SYSTEM_PROMPTS[newMode];
@@ -123,7 +116,7 @@ export class ChatManager {
     );
   }
 
-  async sendMessage(userMessage: string): Promise<AsyncIterable<string>> {
+  async sendMessage(userMessage: string, model: string, mode: ChatMode): Promise<AsyncIterable<string>> {
     if (!this.llmClient) {
       throw new Error('LLM client not initialized. Please check your settings.');
     }
@@ -145,7 +138,7 @@ export class ChatManager {
 
     // Generate title from first user message if not set
     if (!this.sessionTitle) {
-      this.sessionTitle = await this.generateTitle(userMessage);
+      this.sessionTitle = await this.generateTitle(userMessage, model);
     }
 
     // Create file immediately for first message
@@ -156,7 +149,7 @@ export class ChatManager {
     // Build messages for API with file contexts (but don't save to session)
     // Get messages for API (including system message)
     let apiMessages = this.currentSession.messages.filter(
-      msg => msg.role !== 'system' || msg.content === SYSTEM_PROMPTS[this.currentSession!.mode]
+      msg => msg.role !== 'system' || msg.content === SYSTEM_PROMPTS[mode]
     );
 
     // If files are attached, modify the last user message for API only
@@ -181,7 +174,7 @@ export class ChatManager {
 
     try {
       const stream = await this.llmClient.sendMessage(
-        this.currentSession.model,
+        model,
         apiMessages,
         {
           temperature: 0.7,
@@ -268,18 +261,16 @@ export class ChatManager {
     const finalTitle = title || this.sessionTitle || 'Untitled Chat';
 
     const now = new Date().toISOString();
-    const metadata = {
+    const metadata: ChatHistoryMetadata = {
       title: finalTitle,
       createdAt: now,
       lastAccessedAt: now,
-      model: this.currentSession.model,
-      mode: this.currentSession.mode,
     };
 
     return await this.messageRepo.saveChat(this.currentSession.messages, metadata);
   }
 
-  async loadSession(filePath: string, mode: ChatMode, model: string): Promise<void> {
+  async loadSession(filePath: string, mode: ChatMode): Promise<void> {
     const { messages, metadata } = await this.messageRepo.loadChat(filePath);
     
     // Update lastAccessedAt in the saved file
@@ -310,8 +301,6 @@ export class ChatManager {
     
     this.currentSession = {
       messages: sessionMessages,
-      mode: mode,
-      model: model,
       fileContexts: [],
     };
   }
@@ -364,7 +353,7 @@ export class ChatManager {
     );
   }
 
-  private async generateTitle(userMessage: string): Promise<string> {
+  private async generateTitle(userMessage: string, model: string): Promise<string> {
     // Clean message from markdown, file mentions, etc.
     let cleanMessage = userMessage
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove markdown links
@@ -398,7 +387,7 @@ export class ChatManager {
     try {
       const prompt = `Summarize the following user request in 2-5 words. Return only the summary, nothing else:\n\n${cleanMessage}`;
       const title = await this.llmClient.sendMessageNonStreaming(
-        this.currentSession.model,
+        model,
         [
           {
             role: 'user',

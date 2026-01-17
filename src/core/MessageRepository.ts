@@ -31,6 +31,7 @@ export class MessageRepository {
     const filePath = `${this.folderPath}/${fileName}`;
 
     // Save in OpenAI protocol format (JSON)
+    // Model and mode are global settings, not stored in chat file
     const chatData = {
       messages: messages.map(msg => ({
         role: msg.role,
@@ -40,8 +41,6 @@ export class MessageRepository {
         title: metadata.title,
         createdAt: metadata.createdAt,
         lastAccessedAt: metadata.lastAccessedAt,
-        model: metadata.model,
-        mode: metadata.mode,
       },
     };
 
@@ -151,8 +150,6 @@ export class MessageRepository {
           title: chatData.title || 'New Chat',
           createdAt: chatData.created_at,
           lastAccessedAt: chatData.updated_at || chatData.created_at,
-          model: '', // Will be set from global settings when loading
-          mode: '', // Will be set from global settings when loading
         };
 
         return {
@@ -193,8 +190,6 @@ export class MessageRepository {
             title: chatData.title || 'New Chat',
             createdAt: chatData.created_at,
             lastAccessedAt: chatData.updated_at || chatData.created_at,
-            model: '', // Global setting, not stored in file
-            mode: '', // Global setting, not stored in file
           };
           chats.push({ path: file.path, metadata });
         }
