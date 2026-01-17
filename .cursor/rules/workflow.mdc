@@ -6,6 +6,39 @@ alwaysApply: true
 
 # Workflow Rules
 
+## Test-Driven Development (TDD) Principles
+
+This project follows **Test-Driven Development (TDD)** methodology. All new features and bug fixes must follow the TDD cycle:
+
+### TDD Cycle (Red-Green-Refactor)
+
+1. **🔴 RED**: Write a failing test first
+   - Test describes desired behavior
+   - Test must fail for the right reason (not compilation errors)
+   - This ensures test is actually testing something
+
+2. **🟢 GREEN**: Write minimal code to make test pass
+   - Implement just enough code to satisfy the test
+   - Don't over-engineer at this stage
+   - Focus on making test pass
+
+3. **🔵 REFACTOR**: Improve code while keeping tests green
+   - Clean up code, improve structure
+   - Remove duplication
+   - Run tests after each refactoring step
+
+4. **✅ REGRESSION**: Run all tests
+   - Ensure no existing functionality broke
+   - Fix any regressions before proceeding
+
+### Why TDD?
+
+- **Confidence**: Tests prove code works
+- **Documentation**: Tests document expected behavior
+- **Design**: Writing tests first leads to better API design
+- **Regression prevention**: Full test suite catches breaking changes
+- **Faster feedback**: Catch bugs early in development cycle
+
 ## General Development Process
 
 ### Understanding Requirements
@@ -24,11 +57,11 @@ alwaysApply: true
 
 ### Mandatory Workflow for New Features
 
-**CRITICALLY IMPORTANT**: When user asks to implement a new feature (using words "фича", "feature", "новая функция", "добавить", "implement", "add"), **always** follow this workflow:
+**CRITICALLY IMPORTANT**: When user asks to implement a new feature (using words "фича", "feature", "новая функция", "добавить", "implement", "add"), **always** follow this TDD workflow:
 
-**Do not skip any step!** Always follow order: understand → implement → test → verify → report.
+**Do not skip any step!** Always follow order: understand → write test → verify test fails → implement → verify test passes → run all tests → report.
 
-### Step-by-step Process for New Features
+### Step-by-step TDD Process for New Features
 
 1. **Understand requirements**
    - Read SPECIFICATION.md relevant section
@@ -36,24 +69,51 @@ alwaysApply: true
    - Check dependencies
    - Plan implementation approach
 
-2. **Implement feature**
+2. **Write test first (RED phase)**
+   - Create or update test file in `tests/` directory
+   - Write test that describes desired behavior
+   - Test should cover main use case and edge cases
+   - Follow test structure from @testing.mdc
+   - Use mocks for external dependencies
+   - Test file should be in appropriate directory (core/, integration/, utils/, etc.)
+
+3. **Verify test fails (RED phase)**
+   - Run the test: `npm test` or `npm run test:watch`
+   - **CRITICAL**: Test MUST fail at this stage
+   - Verify failure is for the right reason (not compilation errors)
+   - If test passes without implementation, test is wrong - fix it
+
+4. **Implement minimal code (GREEN phase)**
+   - Write minimal code to make test pass
    - Follow rules from @code-style.mdc and @architecture.mdc
    - Use @implementation-order.mdc if adding new classes
-   - Write minimal code that works
    - Add TypeScript types
+   - Don't over-engineer - just make test pass
 
-3. **Test manually**
-   - Test in Obsidian environment
-   - Verify feature works as expected
+5. **Verify test passes (GREEN phase)**
+   - Run the test again: `npm test` or `npm run test:watch`
+   - **CRITICAL**: Test MUST pass now
+   - Verify all assertions in test are satisfied
+   - If test still fails, fix implementation until it passes
+
+6. **Run all tests (REGRESSION phase)**
+   - Run full test suite: `npm test`
+   - **CRITICAL**: All existing tests must still pass
+   - If any test fails, fix regression before proceeding
+   - Verify no breaking changes to existing functionality
+
+7. **Refactor if needed (REFACTOR phase)**
+   - If code can be improved, refactor while keeping tests green
+   - Run tests after each refactoring step
+   - Maintain test coverage
+
+8. **Manual testing (optional but recommended)**
+   - Test in Obsidian environment if applicable
+   - Verify feature works as expected in real usage
    - Check error handling
-   - Test edge cases
+   - Test edge cases manually
 
-4. **Verify integration**
-   - Check integration with other modules
-   - Verify no breaking changes
-   - Test with different settings
-
-5. **Write report**
+9. **Write report**
    - Brief report of work done
    - What feature was implemented
    - Which files were created/modified
@@ -76,30 +136,60 @@ alwaysApply: true
 - `src/core/ChatManager.ts` - added file context handling
 ```
 
-## Bug Fixes
+## Bug Fixes (TDD Approach)
 
 ### Mandatory Workflow for Bug Fixes
 
-**CRITICALLY IMPORTANT**: When user asks to fix a bug (using words "баг", "bug", "ошибка", "error", "исправить", "fix"), **always** follow this workflow:
+**CRITICALLY IMPORTANT**: When user asks to fix a bug (using words "баг", "bug", "ошибка", "error", "исправить", "fix"), **always** follow this TDD workflow:
+
+**Do not skip any step!** Always follow order: reproduce → write test → verify test fails → fix → verify test passes → run all tests → report.
+
+### Step-by-step TDD Process for Bug Fixes
 
 1. **Reproduce bug**
    - Understand what the bug is
-   - Reproduce in Obsidian environment
+   - Reproduce in Obsidian environment or test environment
    - Identify root cause
    - Check related code
 
-2. **Fix code**
+2. **Write test that reproduces bug (RED phase)**
+   - Create or update test file in `tests/` directory
+   - Write test that demonstrates the bug
+   - Test should fail because of the bug
+   - Follow test structure from @testing.mdc
+   - Use descriptive test name like "should handle X correctly when Y bug occurs"
+
+3. **Verify test fails (RED phase)**
+   - Run the test: `npm test` or `npm run test:watch`
+   - **CRITICAL**: Test MUST fail at this stage (reproducing the bug)
+   - Verify failure matches the bug behavior
+   - If test passes, bug might be already fixed or test is wrong
+
+4. **Fix code (GREEN phase)**
    - Write code that fixes bug
    - Follow rules from @code-style.mdc and @architecture.mdc
    - Keep fix minimal and focused
+   - Don't add unnecessary changes
 
-3. **Verify fix**
+5. **Verify test passes (GREEN phase)**
+   - Run the test again: `npm test` or `npm run test:watch`
+   - **CRITICAL**: Test MUST pass now (bug is fixed)
+   - Verify all assertions in test are satisfied
+   - If test still fails, fix implementation until it passes
+
+6. **Run all tests (REGRESSION phase)**
+   - Run full test suite: `npm test`
+   - **CRITICAL**: All existing tests must still pass
+   - If any test fails, fix regression before proceeding
+   - Verify no breaking changes to existing functionality
+
+7. **Manual verification (optional but recommended)**
    - Test in Obsidian environment
-   - Verify bug is fixed
+   - Verify bug is fixed in real usage
    - Check no regressions
    - Test related functionality
 
-4. **Write report**
+8. **Write report**
    - Brief report of work done
    - What was fixed
    - Root cause (if identified)
@@ -122,6 +212,59 @@ alwaysApply: true
 - `src/core/LLMClient.ts` - added timeout handling
 - `src/components/Chat.tsx` - added error display
 ```
+
+## TDD Workflow Example
+
+### Example: Adding a new method to ChatManager
+
+**Feature**: Add method to get message count from current session
+
+**Step 1: Write test (RED)**
+```typescript
+// tests/core/ChatManager.test.ts
+describe('getMessageCount', () => {
+  test('should return 0 for empty session', () => {
+    chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
+    expect(chatManager.getMessageCount()).toBe(0);
+  });
+
+  test('should return correct count after adding messages', async () => {
+    chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
+    await chatManager.sendMessage('Hello');
+    expect(chatManager.getMessageCount()).toBe(2); // system + user
+  });
+});
+```
+
+**Step 2: Verify test fails (RED)**
+```bash
+npm test
+# ❌ Test fails: getMessageCount is not a function
+```
+
+**Step 3: Implement minimal code (GREEN)**
+```typescript
+// src/core/ChatManager.ts
+getMessageCount(): number {
+  const session = this.getCurrentSession();
+  return session ? session.messages.length : 0;
+}
+```
+
+**Step 4: Verify test passes (GREEN)**
+```bash
+npm test
+# ✅ Test passes: getMessageCount returns correct count
+```
+
+**Step 5: Run all tests (REGRESSION)**
+```bash
+npm test
+# ✅ All tests pass - no regressions
+```
+
+**Step 6: Refactor if needed (REFACTOR)**
+- Code is already clean, no refactoring needed
 
 ## Implementation Order
 
@@ -146,11 +289,14 @@ Follow architecture layers from @architecture.mdc:
 
 Before considering work complete:
 
+- [ ] **TDD workflow followed**: Test written first, verified to fail, then implementation
+- [ ] **Tests pass**: All new tests pass
+- [ ] **No regressions**: All existing tests still pass (`npm test`)
 - [ ] Code follows @code-style.mdc rules
 - [ ] Architecture boundaries respected (@architecture.mdc)
 - [ ] TypeScript types are correct
 - [ ] Error handling is in place
-- [ ] Tested in Obsidian environment
+- [ ] Tested in Obsidian environment (if applicable)
 - [ ] No console errors
 - [ ] Comments are in English
 - [ ] Empty line at end of files
@@ -181,3 +327,4 @@ Before considering work complete:
 @architecture.mdc
 @code-style.mdc
 @implementation-order.mdc
+@testing.mdc

@@ -8,4 +8,5 @@ dist/
 build/
 .idea/
 package-lock.json
+sgr-agent-core
 sgr-agent-core.js
