@@ -1103,3 +1103,79 @@
   line-height: 1;
   flex-shrink: 0;
 }
+
+/* Tool Call Styles */
+.sgr-assistant-message-with-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sgr-tool-call {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-modifier-form-field-highlighted);
+}
+
+.sgr-tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.sgr-tool-call-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sgr-tool-call-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.sgr-tool-call-duration {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+.sgr-tool-call-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.sgr-tool-call-content {
+  padding: 12px;
+  background: var(--background-primary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.sgr-tool-call-json {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+.sgr-final-answer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}

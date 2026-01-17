@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChatMessage } from "../types";
+import { ChatMessage, ToolCall } from "../types";
 import { App } from "obsidian";
 
 interface ChatMessagesProps {
@@ -19,6 +19,21 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   scrollContainerRef,
   onEditMessage,
 }) => {
+  // Remove JSON from content if it's already displayed in toolCalls
+  const removeToolCallJSON = (content: string, toolCalls?: ToolCall[]): string => {
+    if (!toolCalls || toolCalls.length === 0) {
+      return content;
+    }
+
+    let cleanedContent = content;
+    for (const toolCall of toolCalls) {
+      if (toolCall.rawJson) {
+        // Remove the JSON string from content
+        cleanedContent = cleanedContent.replace(toolCall.rawJson, '').trim();
+      }
+    }
+    return cleanedContent;
+  };
   const displayMessages = messages.filter((msg) => msg.role !== "system");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
@@ -195,11 +210,40 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           className={`sgr-message sgr-message-${message.role}`}
         >
           <div className="sgr-message-content">
-            <MarkdownContent
-              content={message.content}
-              app={app}
-              className={message.role === "assistant" ? "sgr-markdown" : "sgr-message-text"}
-            />
+            {message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0 ? (
+              <div className="sgr-assistant-message-with-tools">
+                {message.toolCalls.map((toolCall, toolIndex) => (
+                  <ToolCallDisplay
+                    key={toolIndex}
+                    toolCall={toolCall}
+                  />
+                ))}
+                {message.finalAnswer ? (
+                  <div className="sgr-final-answer">
+                    <MarkdownContent
+                      content={message.finalAnswer}
+                      app={app}
+                      className="sgr-markdown"
+                    />
+                  </div>
+                ) : (
+                  // Show content without JSON that's already in toolCalls
+                  <div className="sgr-message-remaining-content">
+                    <MarkdownContent
+                      content={removeToolCallJSON(message.content, message.toolCalls)}
+                      app={app}
+                      className="sgr-markdown"
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <MarkdownContent
+                content={message.content}
+                app={app}
+                className={message.role === "assistant" ? "sgr-markdown" : "sgr-message-text"}
+              />
+            )}
           </div>
           <div className="sgr-message-actions">
             <CopyButton content={message.content} />
@@ -681,6 +725,49 @@ const EditButton: React.FC<EditButtonProps> = ({ onClick }) => {
         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
       </svg>
     </button>
+  );
+};
+
+// Component for displaying tool calls in collapsed format
+interface ToolCallDisplayProps {
+  toolCall: ToolCall;
+}
+
+const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({ toolCall }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const formatDuration = (ms?: number): string => {
+    if (!ms) return '...';
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+  };
+
+  const formatToolName = (name: string): string => {
+    // Convert snake_case to Title Case
+    return name
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  return (
+    <div className="sgr-tool-call">
+      <button
+        className="sgr-tool-call-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className="sgr-tool-call-name">{formatToolName(toolCall.toolName)}</span>
+        <span className="sgr-tool-call-duration">{formatDuration(toolCall.duration)}</span>
+        <span className="sgr-tool-call-toggle">{isExpanded ? '▼' : '▶'}</span>
+      </button>
+      {isExpanded && toolCall.rawJson && (
+        <div className="sgr-tool-call-content">
+          <pre className="sgr-tool-call-json">
+            {JSON.stringify(JSON.parse(toolCall.rawJson), null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -1,7 +1,7 @@
 import { LLMClient, NetworkError, LLMAPIError, InvalidModelError, RateLimitError } from "./LLMClient";
 import { MessageRepository } from "./MessageRepository";
 import { AgentManager } from "./AgentManager";
-import { ChatMessage, FileContext, ChatHistoryMetadata } from "../types";
+import { ChatMessage, FileContext, ChatHistoryMetadata, ToolCall } from "../types";
 import { ChatMode } from "../constants";
 import { App, TFile } from "obsidian";
 
@@ -190,12 +190,201 @@ export class ChatManager {
     const lastMessage = this.currentSession.messages[this.currentSession.messages.length - 1];
     if (lastMessage && lastMessage.role === 'assistant') {
       lastMessage.content += content;
+      // Try to parse JSON from accumulated content
+      this.parseAndUpdateToolCalls(lastMessage);
     } else {
-      this.currentSession.messages.push({
+      const newMessage: ChatMessage = {
         role: 'assistant',
         content,
         timestamp: Date.now(),
-      });
+      };
+      this.currentSession.messages.push(newMessage);
+      // Try to parse JSON from content
+      this.parseAndUpdateToolCalls(newMessage);
+    }
+  }
+
+  private parseAndUpdateToolCalls(message: ChatMessage): void {
+    // Try to find JSON objects in the content
+    // Pattern: { "reasoningSteps": ..., "function": { "toolName": ..., "arguments": ... } }
+    // Use a more robust approach to find complete JSON objects
+    const jsonMatches = this.extractJSONObjects(message.content);
+    
+    if (jsonMatches.length === 0) {
+      // If no JSON found but toolCalls exist, they were loaded from history - keep them
+      return;
+    }
+
+    // Initialize toolCalls array if not exists
+    if (!message.toolCalls) {
+      message.toolCalls = [];
+    }
+
+    // Track which JSON strings we've already processed (by checking rawJson)
+    const processedJsonStrings = new Set(message.toolCalls.map(tc => tc.rawJson).filter(Boolean));
+
+    // Process each JSON match
+    for (const jsonStr of jsonMatches) {
+      // Skip if we've already processed this exact JSON (from saved toolCalls)
+      if (processedJsonStrings.has(jsonStr)) {
+        continue;
+      }
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        
+        // Check if this is a tool call JSON
+        if (parsed.function && parsed.function.toolName) {
+          const toolName = parsed.function.toolName;
+          const toolArgs = parsed.function.arguments || '{}';
+          
+          // Check if this tool call already exists (by toolName and similar JSON structure)
+          const existingCall = message.toolCalls!.find(
+            tc => tc.toolName === toolName && 
+            this.isSimilarJSON(tc.rawJson || '', jsonStr)
+          );
+          
+          if (!existingCall) {
+            // New tool call - use timestamp from message if available, otherwise current time
+            const startTime = message.timestamp || Date.now();
+            const toolCall: ToolCall = {
+              toolName,
+              arguments: typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs),
+              startTime,
+              rawJson: jsonStr,
+            };
+            message.toolCalls.push(toolCall);
+            processedJsonStrings.add(jsonStr);
+          } else {
+            // Update existing tool call with latest JSON
+            // Preserve original startTime if it exists
+            if (!existingCall.startTime) {
+              existingCall.startTime = message.timestamp || Date.now();
+            }
+            existingCall.rawJson = jsonStr;
+            existingCall.arguments = typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs);
+            // Only update endTime if it's not already set (from saved data)
+            if (!existingCall.endTime) {
+              existingCall.endTime = Date.now();
+              existingCall.duration = existingCall.endTime - existingCall.startTime;
+            }
+            processedJsonStrings.add(jsonStr);
+          }
+
+          // Extract final answer if this is final_answer tool
+          if (toolName === 'final_answer') {
+            this.extractFinalAnswer(parsed, message);
+          }
+        }
+      } catch (e) {
+        // Skip invalid JSON
+        continue;
+      }
+    }
+  }
+
+  private extractJSONObjects(content: string): string[] {
+    const results: string[] = [];
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === '{') {
+        if (depth === 0) {
+          start = i;
+        }
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0 && start !== -1) {
+          const jsonStr = content.substring(start, i + 1);
+          // Check if this looks like a tool call JSON
+          if (jsonStr.includes('"function"') && jsonStr.includes('"toolName"')) {
+            results.push(jsonStr);
+          }
+          start = -1;
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private isSimilarJSON(json1: string, json2: string): boolean {
+    try {
+      const obj1 = JSON.parse(json1);
+      const obj2 = JSON.parse(json2);
+      return obj1.function?.toolName === obj2.function?.toolName;
+    } catch {
+      return false;
+    }
+  }
+
+  private extractFinalAnswer(parsed: any, message: ChatMessage): void {
+    if (!parsed.function || !parsed.function.arguments) {
+      return;
+    }
+
+    try {
+      let args = parsed.function.arguments;
+      
+      // If arguments is a string, try to parse it
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          // If parsing fails, try to extract answer directly from string
+          const answerMatch = args.match(/"answer"\s*:\s*"([^"]+)"/);
+          if (answerMatch) {
+            message.finalAnswer = answerMatch[1];
+            return;
+          }
+          // Try without quotes
+          const answerMatch2 = args.match(/"answer"\s*:\s*([^,}]+)/);
+          if (answerMatch2) {
+            message.finalAnswer = answerMatch2[1].trim().replace(/^["']|["']$/g, '');
+            return;
+          }
+        }
+      }
+
+      // If args is an object, look for answer field
+      if (typeof args === 'object' && args !== null) {
+        if (args.answer) {
+          message.finalAnswer = typeof args.answer === 'string' ? args.answer : JSON.stringify(args.answer);
+        } else if (args.content) {
+          message.finalAnswer = typeof args.content === 'string' ? args.content : JSON.stringify(args.content);
+        } else if (args.text) {
+          message.finalAnswer = typeof args.text === 'string' ? args.text : JSON.stringify(args.text);
+        } else if (args.message) {
+          message.finalAnswer = typeof args.message === 'string' ? args.message : JSON.stringify(args.message);
+        }
+      }
+    } catch (e) {
+      // Skip extraction errors
     }
   }
 
@@ -280,10 +469,31 @@ export class ChatManager {
     // Restore current chat file path
     this.currentChatFilePath = filePath;
     
+    // Parse toolCalls from messages that don't have them (for backward compatibility)
+    // This handles old chat history that was saved before toolCalls were added
+    // Also re-parse messages that have toolCalls but might be missing some data
+    const processedMessages = messages.map(msg => {
+      if (msg.role === 'assistant') {
+        const processedMsg = { ...msg };
+        // If toolCalls exist but are incomplete, or if content has JSON but no toolCalls,
+        // re-parse to ensure toolCalls are complete and up-to-date
+        // This handles cases where:
+        // 1. Old messages were saved before toolCalls were added
+        // 2. toolCalls were partially saved or missing
+        // 3. Content has JSON that wasn't parsed into toolCalls
+        if (!processedMsg.toolCalls || processedMsg.toolCalls.length === 0 || 
+            processedMsg.content.includes('"function"') && processedMsg.content.includes('"toolName"')) {
+          this.parseAndUpdateToolCalls(processedMsg);
+        }
+        return processedMsg;
+      }
+      return msg;
+    });
+    
     // System prompts are now handled by the agent library
     // No need to add system message
     this.currentSession = {
-      messages: messages,
+      messages: processedMessages,
       fileContexts: [],
     };
   }

@@ -33,10 +33,22 @@ export class MessageRepository {
     // Save in OpenAI protocol format (JSON)
     // Model and mode are global settings, not stored in chat file
     const chatData = {
-      messages: messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      })),
+      messages: messages.map(msg => {
+        const msgData: any = {
+          role: msg.role,
+          content: msg.content,
+        };
+        if (msg.timestamp) {
+          msgData.timestamp = msg.timestamp;
+        }
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          msgData.toolCalls = msg.toolCalls;
+        }
+        if (msg.finalAnswer) {
+          msgData.finalAnswer = msg.finalAnswer;
+        }
+        return msgData;
+      }),
       metadata: {
         title: metadata.title,
         createdAt: metadata.createdAt,
@@ -87,11 +99,22 @@ export class MessageRepository {
       title,
       created_at,
       updated_at: now,
-      messages: messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-      })),
+      messages: messages.map(msg => {
+        const msgData: any = {
+          role: msg.role,
+          content: msg.content,
+        };
+        if (msg.timestamp) {
+          msgData.timestamp = msg.timestamp;
+        }
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          msgData.toolCalls = msg.toolCalls;
+        }
+        if (msg.finalAnswer) {
+          msgData.finalAnswer = msg.finalAnswer;
+        }
+        return msgData;
+      }),
     };
 
     const content = JSON.stringify(chatData, null, 2);
@@ -123,11 +146,30 @@ export class MessageRepository {
           throw new Error('Invalid chat file format: missing messages array');
         }
 
-        const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        }));
+        const messages: ChatMessage[] = chatData.messages.map((msg: any) => {
+          const message: ChatMessage = {
+            role: msg.role,
+            content: msg.content,
+          };
+          if (msg.timestamp) {
+            message.timestamp = msg.timestamp;
+          }
+          // Properly restore toolCalls if they exist
+          if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+            message.toolCalls = msg.toolCalls.map((tc: any) => ({
+              toolName: tc.toolName,
+              arguments: tc.arguments || '{}',
+              startTime: tc.startTime || msg.timestamp || Date.now(),
+              endTime: tc.endTime,
+              duration: tc.duration,
+              rawJson: tc.rawJson,
+            }));
+          }
+          if (msg.finalAnswer) {
+            message.finalAnswer = msg.finalAnswer;
+          }
+          return message;
+        });
 
         return {
           messages,
@@ -139,11 +181,30 @@ export class MessageRepository {
           throw new Error('Invalid chat file format: missing messages array');
         }
 
-        const messages: ChatMessage[] = chatData.messages.map((msg: any) => ({
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        }));
+        const messages: ChatMessage[] = chatData.messages.map((msg: any) => {
+          const message: ChatMessage = {
+            role: msg.role,
+            content: msg.content,
+          };
+          if (msg.timestamp) {
+            message.timestamp = msg.timestamp;
+          }
+          // Properly restore toolCalls if they exist
+          if (msg.toolCalls && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+            message.toolCalls = msg.toolCalls.map((tc: any) => ({
+              toolName: tc.toolName,
+              arguments: tc.arguments || '{}',
+              startTime: tc.startTime || msg.timestamp || Date.now(),
+              endTime: tc.endTime,
+              duration: tc.duration,
+              rawJson: tc.rawJson,
+            }));
+          }
+          if (msg.finalAnswer) {
+            message.finalAnswer = msg.finalAnswer;
+          }
+          return message;
+        });
 
         // Model and mode are global settings, not stored in file
         const metadata: ChatHistoryMetadata = {
