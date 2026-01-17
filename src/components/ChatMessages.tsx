@@ -246,7 +246,13 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             )}
           </div>
           <div className="sgr-message-actions">
-            <CopyButton content={message.content} />
+            <CopyButton 
+              content={
+                message.role === "assistant" && message.finalAnswer 
+                  ? message.finalAnswer 
+                  : message.content
+              } 
+            />
             {message.role === "user" && onEditMessage && (
               <EditButton
                 onClick={() => onEditMessage(index, message.content)}
