@@ -1,6 +1,5 @@
 import {
   SGRAgent,
-  createOpenAIClient,
   AgentConfig,
   StreamingCallback,
 } from "sgr-agent-core";
@@ -76,7 +75,15 @@ export class AgentManager {
         : undefined,
     };
 
-    this.openaiClient = createOpenAIClient(llmConfig);
+    // Create OpenAI client directly with dangerouslyAllowBrowser option
+    // This is required for Obsidian (Electron) environment
+    // If proxy is specified, use it as baseURL (proxy should forward to baseUrl)
+    const clientBaseURL = proxy || baseUrl;
+    this.openaiClient = new OpenAI({
+      apiKey: apiKey,
+      baseURL: clientBaseURL,
+      dangerouslyAllowBrowser: true,
+    });
   }
 
   setStreamingCallback(callback: StreamingCallback | null): void {

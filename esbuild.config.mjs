@@ -23,6 +23,11 @@ const context = await esbuild.context({
   },
   entryPoints: ["src/main.ts"],
   bundle: true,
+  loader: {
+    ".ts": "ts",
+    ".tsx": "tsx",
+  },
+  jsx: "transform",
   external: [
     "obsidian",
     "electron",

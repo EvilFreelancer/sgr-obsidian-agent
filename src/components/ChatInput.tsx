@@ -550,12 +550,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               title={enableWebSearch ? "Disable web search" : "Enable web search"}
               disabled={disabled}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                <circle cx="8" cy="8" r="2" fill="currentColor" />
-                <path d="M8 2 L8 0 M8 16 L8 14 M2 8 L0 8 M16 8 L14 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M11.31 4.69 L12.73 3.27 M3.27 12.73 L4.69 11.31 M11.31 11.31 L12.73 12.73 M3.27 3.27 L4.69 4.69" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              🔍
             </button>
           )}
         </div>

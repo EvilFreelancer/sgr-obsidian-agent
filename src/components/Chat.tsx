@@ -318,10 +318,7 @@ export const Chat: React.FC<ChatProps> = ({
             onClick={onOpenHistory}
             title="History"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 2C4.69 2 2 4.69 2 8s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10.5c-2.48 0-4.5-2.02-4.5-4.5S5.52 3.5 8 3.5 12.5 5.52 12.5 8 10.48 12.5 8 12.5z" />
-              <path d="M8.5 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-            </svg>
+            ⏰
           </button>
           <button
             className="sgr-top-bar-button sgr-settings-button"
