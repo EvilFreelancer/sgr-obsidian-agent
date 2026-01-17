@@ -16,7 +16,11 @@ describe('Auto-save Chat History', () => {
       messageRepo,
       mockApp as any,
       'https://api.example.com',
-      'test-key'
+      'test-key',
+      undefined,
+      'gpt-4',
+      0.7,
+      2000
     );
   });
 

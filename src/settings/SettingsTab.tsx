@@ -121,5 +121,21 @@ export class SettingsTab extends PluginSettingTab {
             this.plugin.updateMessageRepository();
           })
       );
+
+    // Tavily API Key (optional)
+    new Setting(containerEl)
+      .setName("Tavily API Key")
+      .setDesc("Optional API key for Tavily web search. If not set, web search tools will be disabled.")
+      .addText((text) => {
+        text
+          .setPlaceholder("tvly-...")
+          .setValue(this.plugin.settings.tavilyApiKey || "")
+          .inputEl.type = "password";
+        text.onChange(async (value) => {
+          this.plugin.settings.tavilyApiKey = value || undefined;
+          await this.plugin.saveSettings();
+          this.plugin.updateLLMClient();
+        });
+      });
   }
 }

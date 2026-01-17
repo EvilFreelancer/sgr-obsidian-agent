@@ -16,7 +16,11 @@ describe('Chat Session Persistence', () => {
       messageRepo,
       mockApp as any,
       'https://api.example.com',
-      'test-key'
+      'test-key',
+      undefined,
+      'gpt-4',
+      0.7,
+      2000
     );
   });
 
@@ -44,7 +48,7 @@ describe('Chat Session Persistence', () => {
 
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    await chatManager.loadSession(filePath, CHAT_MODES.ASK);
+    await chatManager.loadSession(filePath);
 
     const updatedContent = mockApp.vault.getFileContent(filePath);
     const updatedParsed = JSON.parse(updatedContent!);
@@ -55,7 +59,7 @@ describe('Chat Session Persistence', () => {
     );
   });
 
-  test('should add system message when loading session', async () => {
+  test('should load messages without system message', async () => {
     chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
     chatManager.appendAssistantMessage('Hello, how can I help?');
 
@@ -66,15 +70,15 @@ describe('Chat Session Persistence', () => {
       'Test Chat'
     );
 
-    await chatManager.loadSession(filePath, CHAT_MODES.ASK);
+    await chatManager.loadSession(filePath);
 
     const session = chatManager.getCurrentSession();
     expect(session).toBeDefined();
     expect(session!.messages.length).toBeGreaterThan(0);
 
-    const systemMessage = session!.messages.find(msg => msg.role === 'system');
-    expect(systemMessage).toBeDefined();
-    expect(systemMessage!.content).toBe('You are a helpful assistant. Answer questions directly and concisely.');
+    // System messages are no longer added
+    const systemMessages = session!.messages.filter(msg => msg.role === 'system');
+    expect(systemMessages.length).toBe(0);
   });
 
   test('should preserve all messages when loading', async () => {
@@ -104,23 +108,20 @@ describe('Chat Session Persistence', () => {
       'Test Chat'
     );
 
-    await chatManager.loadSession(filePath, CHAT_MODES.ASK);
+    await chatManager.loadSession(filePath);
 
     const loadedSession = chatManager.getCurrentSession();
     expect(loadedSession).toBeDefined();
 
-    // Should have: system + user + assistant + user + assistant = 5 messages
-    // But system message is added by loadSession, so we check total
-    expect(loadedSession!.messages.length).toBeGreaterThanOrEqual(5);
+    // Should have: user + assistant + user + assistant = 4 messages (no system message)
+    expect(loadedSession!.messages.length).toBeGreaterThanOrEqual(4);
 
     const userMessages = loadedSession!.messages.filter(msg => msg.role === 'user');
     const assistantMessages = loadedSession!.messages.filter(msg => msg.role === 'assistant');
     const systemMessages = loadedSession!.messages.filter(msg => msg.role === 'system');
 
-    // System message may be in saved messages and also added by loadSession
-    expect(systemMessages.length).toBeGreaterThanOrEqual(1);
-    // First message should be system message
-    expect(loadedSession!.messages[0].role).toBe('system');
+    // System messages are no longer added
+    expect(systemMessages.length).toBe(0);
     expect(userMessages.length).toBe(2);
     expect(assistantMessages.length).toBe(2);
   });

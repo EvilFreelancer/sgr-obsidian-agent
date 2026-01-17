@@ -594,6 +594,48 @@
   flex: 1;
 }
 
+.sgr-web-search-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.sgr-web-search-toggle:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.sgr-web-search-toggle:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.sgr-web-search-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sgr-web-search-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sgr-web-search-disabled {
+  color: var(--text-muted);
+}
+
+.sgr-web-search-enabled {
+  color: #a855f7; /* Purple color for enabled state */
+}
+
 .sgr-chat-input-actions {
   display: flex;
   gap: 4px;
@@ -602,13 +644,6 @@
 .sgr-chat-action-button {
   font-size: 12px;
   padding: 4px 8px;
-}
-
-.sgr-chat-input-selectors {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: 1;
 }
 
 .sgr-file-pills {

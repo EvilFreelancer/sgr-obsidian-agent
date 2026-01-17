@@ -53,7 +53,11 @@ export default class SGRPlugin extends Plugin {
         this.app,
         this.settings.baseUrl,
         this.settings.apiKey,
-        this.settings.proxy
+        this.settings.proxy,
+        this.settings.defaultModel,
+        this.settings.temperature,
+        this.settings.maxTokens,
+        this.settings.tavilyApiKey
       );
     }
   }
@@ -66,7 +70,11 @@ export default class SGRPlugin extends Plugin {
         this.chatManager.updateClient(
           this.settings.baseUrl,
           this.settings.apiKey,
-          this.settings.proxy
+          this.settings.proxy,
+          this.settings.defaultModel,
+          this.settings.temperature,
+          this.settings.maxTokens,
+          this.settings.tavilyApiKey
         );
       }
     } else {

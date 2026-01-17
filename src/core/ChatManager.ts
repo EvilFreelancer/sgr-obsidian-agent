@@ -1,7 +1,8 @@
 import { LLMClient, NetworkError, LLMAPIError, InvalidModelError, RateLimitError } from "./LLMClient";
 import { MessageRepository } from "./MessageRepository";
+import { AgentManager } from "./AgentManager";
 import { ChatMessage, FileContext, ChatHistoryMetadata } from "../types";
-import { ChatMode, SYSTEM_PROMPTS } from "../constants";
+import { ChatMode } from "../constants";
 import { App, TFile } from "obsidian";
 
 export interface ChatSession {
@@ -11,30 +12,66 @@ export interface ChatSession {
 
 export class ChatManager {
   private llmClient: LLMClient | null = null;
+  private agentManager: AgentManager | null = null;
   private messageRepo: MessageRepository;
   private app: App;
   private currentSession: ChatSession | null = null;
   private sessionTitle: string | null = null;
   private sessionTimestamp: number | null = null;
   private currentChatFilePath: string | null = null;
+  private currentModel: string = "";
+  private currentTemperature: number = 0.7;
+  private currentMaxTokens: number = 2000;
+  private currentTavilyApiKey: string | undefined = undefined;
 
   constructor(
     messageRepo: MessageRepository,
     app: App,
     baseUrl: string,
     apiKey: string,
-    proxy?: string
+    proxy?: string,
+    model?: string,
+    temperature?: number,
+    maxTokens?: number,
+    tavilyApiKey?: string
   ) {
     this.messageRepo = messageRepo;
     this.app = app;
-    this.updateClient(baseUrl, apiKey, proxy);
+    this.currentModel = model || "";
+    this.currentTemperature = temperature ?? 0.7;
+    this.currentMaxTokens = maxTokens ?? 2000;
+    this.currentTavilyApiKey = tavilyApiKey;
+    this.updateClient(baseUrl, apiKey, proxy, model, temperature, maxTokens, tavilyApiKey);
   }
 
-  updateClient(baseUrl: string, apiKey: string, proxy?: string): void {
+  updateClient(
+    baseUrl: string,
+    apiKey: string,
+    proxy?: string,
+    model?: string,
+    temperature?: number,
+    maxTokens?: number,
+    tavilyApiKey?: string
+  ): void {
     if (baseUrl && apiKey) {
       this.llmClient = new LLMClient(baseUrl, apiKey, proxy);
+      this.currentModel = model || this.currentModel || "";
+      this.currentTemperature = temperature ?? this.currentTemperature;
+      this.currentMaxTokens = maxTokens ?? this.currentMaxTokens;
+      this.currentTavilyApiKey = tavilyApiKey;
+      this.agentManager = new AgentManager(
+        baseUrl,
+        apiKey,
+        proxy,
+        this.currentModel,
+        this.currentTemperature,
+        this.currentMaxTokens,
+        this.currentTavilyApiKey,
+        false // enableWebSearch - will be set per request
+      );
     } else {
       this.llmClient = null;
+      this.agentManager = null;
     }
   }
 
@@ -46,36 +83,12 @@ export class ChatManager {
     this.sessionTitle = null;
     this.sessionTimestamp = Date.now();
     this.currentChatFilePath = null;
-
-    // Add system message
-    const systemPrompt = SYSTEM_PROMPTS[mode];
-    this.currentSession.messages.push({
-      role: 'system',
-      content: systemPrompt,
-    });
+    // System prompts are now handled by the agent library
   }
 
   updateMode(newMode: ChatMode): void {
-    if (!this.currentSession) {
-      return;
-    }
-
-    // Update system message (first message should be system)
-    const systemPrompt = SYSTEM_PROMPTS[newMode];
-    const systemMessageIndex = this.currentSession.messages.findIndex(
-      msg => msg.role === 'system'
-    );
-    
-    if (systemMessageIndex >= 0) {
-      // Update existing system message
-      this.currentSession.messages[systemMessageIndex].content = systemPrompt;
-    } else {
-      // Add system message if it doesn't exist (shouldn't happen, but just in case)
-      this.currentSession.messages.unshift({
-        role: 'system',
-        content: systemPrompt,
-      });
-    }
+    // Mode is used when executing agent, no need to update system message
+    // System prompts are now handled by the agent library
   }
 
   addFileContext(filePath: string): Promise<void> {
@@ -116,9 +129,14 @@ export class ChatManager {
     );
   }
 
-  async sendMessage(userMessage: string, model: string, mode: ChatMode): Promise<AsyncIterable<string>> {
-    if (!this.llmClient) {
-      throw new Error('LLM client not initialized. Please check your settings.');
+  async sendMessage(
+    userMessage: string,
+    model: string,
+    mode: ChatMode,
+    enableWebSearch: boolean = false
+  ): Promise<AsyncIterable<string>> {
+    if (!this.agentManager) {
+      throw new Error('Agent not initialized. Please check your settings.');
     }
 
     if (!this.currentSession) {
@@ -133,7 +151,7 @@ export class ChatManager {
     };
     this.currentSession.messages.push(userMsg);
 
-    // Check if this is the first user message (only system message exists)
+    // Check if this is the first user message
     const isFirstMessage = this.currentSession.messages.filter(m => m.role === 'user').length === 1;
 
     // Generate title from first user message if not set
@@ -146,41 +164,14 @@ export class ChatManager {
       await this.createChatFile();
     }
 
-    // Build messages for API with file contexts (but don't save to session)
-    // Get messages for API (including system message)
-    let apiMessages = this.currentSession.messages.filter(
-      msg => msg.role !== 'system' || msg.content === SYSTEM_PROMPTS[mode]
-    );
-
-    // If files are attached, modify the last user message for API only
-    if (this.currentSession.fileContexts.length > 0) {
-      const fileContextsText = this.currentSession.fileContexts
-        .map(fc => `[File: ${fc.path}]\n${fc.content}\n[/File]`)
-        .join('\n\n');
-      
-      // Create modified message for API (with file contexts)
-      // but keep original in session
-      apiMessages = apiMessages.map((msg, index) => {
-        // Modify only the last user message (the one we just added)
-        if (msg.role === 'user' && index === apiMessages.length - 1) {
-          return {
-            ...msg,
-            content: `${fileContextsText}\n\n${userMessage}`,
-          };
-        }
-        return msg;
-      });
-    }
-
     try {
-      const stream = await this.llmClient.sendMessage(
-        model,
-        apiMessages,
-        {
-          temperature: 0.7,
-          maxTokens: 2000,
-          stream: true,
-        }
+      // Use AgentManager to execute agent
+      const stream = await this.agentManager.executeAgent(
+        userMessage,
+        mode,
+        this.currentSession.fileContexts,
+        enableWebSearch,
+        this.currentTavilyApiKey
       );
 
       return stream;
@@ -217,11 +208,11 @@ export class ChatManager {
       return;
     }
 
-    // Find the actual index in messages array (accounting for system message)
-    // messageIndex is the index in displayMessages (without system), so we need to add 1
-    const actualIndex = messageIndex + 1; // +1 for system message
+    // messageIndex is the index in displayMessages (without system)
+    // No system message anymore, so use index directly
+    const actualIndex = messageIndex;
     
-    // Keep system message and messages up to and including the selected message
+    // Keep messages up to and including the selected message
     this.currentSession.messages = this.currentSession.messages.slice(0, actualIndex + 1);
     
     // Clear file contexts when editing (user can re-add them if needed)
@@ -270,7 +261,7 @@ export class ChatManager {
     return await this.messageRepo.saveChat(this.currentSession.messages, metadata);
   }
 
-  async loadSession(filePath: string, mode: ChatMode): Promise<void> {
+  async loadSession(filePath: string): Promise<void> {
     const { messages, metadata } = await this.messageRepo.loadChat(filePath);
     
     // Update lastAccessedAt in the saved file
@@ -289,18 +280,10 @@ export class ChatManager {
     // Restore current chat file path
     this.currentChatFilePath = filePath;
     
-    // Add system message to the session using global mode
-    const systemPrompt = SYSTEM_PROMPTS[mode];
-    const sessionMessages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      ...messages,
-    ];
-    
+    // System prompts are now handled by the agent library
+    // No need to add system message
     this.currentSession = {
-      messages: sessionMessages,
+      messages: messages,
       fileContexts: [],
     };
   }

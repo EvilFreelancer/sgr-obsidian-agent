@@ -12,6 +12,7 @@ export interface AgentSettings {
   maxTokens: number;
   chatHistoryFolder: string;
   lastChatPath?: string;
+  tavilyApiKey?: string;
 }
 
 export function getDefaultSettings(): AgentSettings {

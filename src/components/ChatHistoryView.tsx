@@ -98,9 +98,7 @@ export class ChatHistoryView extends ItemView {
         onLoadChat={async (filePath: string) => {
           const chatManager = this.plugin.getChatManager();
           if (chatManager) {
-            // Use global settings for mode (model is global, not stored in chat)
-            const mode = this.plugin.settings.defaultMode;
-            await chatManager.loadSession(filePath, mode);
+            await chatManager.loadSession(filePath);
             // Save last chat path to settings
             this.plugin.settings.lastChatPath = filePath;
             await this.plugin.saveSettings();

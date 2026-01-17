@@ -20,8 +20,10 @@ export const DEFAULT_SETTINGS = {
 
 export type ChatMode = typeof CHAT_MODES[keyof typeof CHAT_MODES];
 
+// System prompts are now handled by the agent library
+// Keeping this for backward compatibility if needed elsewhere
 export const SYSTEM_PROMPTS = {
-  [CHAT_MODES.AGENT]: "You are an autonomous AI agent. You can use tools to accomplish tasks. Think step by step and decide which actions to take.",
-  [CHAT_MODES.ASK]: "You are a helpful assistant. Answer questions directly and concisely.",
-  [CHAT_MODES.PLAN]: "You are a planning assistant. Break down tasks into steps and execute them systematically.",
+  [CHAT_MODES.AGENT]: "",
+  [CHAT_MODES.ASK]: "",
+  [CHAT_MODES.PLAN]: "",
 };

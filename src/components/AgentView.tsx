@@ -75,8 +75,7 @@ export class AgentView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(lastChatPath);
         if (file) {
           // Load the last chat
-          const mode = this.plugin.settings.defaultMode;
-          await chatManager.loadSession(lastChatPath, mode);
+          await chatManager.loadSession(lastChatPath);
         } else {
           // File doesn't exist, clear lastChatPath
           this.plugin.settings.lastChatPath = undefined;
@@ -100,6 +99,7 @@ export class AgentView extends ItemView {
         proxy={this.plugin.settings.proxy}
         defaultModel={this.plugin.settings.defaultModel}
         defaultMode={this.plugin.settings.defaultMode}
+        tavilyApiKey={this.plugin.settings.tavilyApiKey}
         onModeChange={async (mode) => {
           this.plugin.settings.defaultMode = mode;
           await this.plugin.saveSettings();

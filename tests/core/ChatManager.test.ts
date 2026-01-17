@@ -16,19 +16,21 @@ describe('ChatManager', () => {
       messageRepo,
       mockApp as any,
       'https://api.example.com',
-      'test-key'
+      'test-key',
+      undefined,
+      'gpt-4',
+      0.7,
+      2000
     );
   });
 
   describe('startSession', () => {
-    test('should create new session with system message', () => {
+    test('should create new session without system message', () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
 
       const session = chatManager.getCurrentSession();
       expect(session).not.toBeNull();
-      expect(session!.messages.length).toBe(1);
-      expect(session!.messages[0].role).toBe('system');
-      expect(session!.messages[0].content).toBe(SYSTEM_PROMPTS[CHAT_MODES.ASK]);
+      expect(session!.messages.length).toBe(0); // No system message anymore
     });
 
     test('should initialize file contexts as empty array', () => {
@@ -37,23 +39,12 @@ describe('ChatManager', () => {
       const session = chatManager.getCurrentSession();
       expect(session!.fileContexts).toEqual([]);
     });
-
-    test('should use correct system prompt for each mode', () => {
-      chatManager.startSession(CHAT_MODES.AGENT, 'gpt-4');
-      expect(chatManager.getCurrentSession()!.messages[0].content).toBe(SYSTEM_PROMPTS[CHAT_MODES.AGENT]);
-
-      chatManager.startSession(CHAT_MODES.PLAN, 'gpt-4');
-      expect(chatManager.getCurrentSession()!.messages[0].content).toBe(SYSTEM_PROMPTS[CHAT_MODES.PLAN]);
-    });
   });
 
   describe('updateMode', () => {
-    test('should update system message when mode changes', () => {
+    test('should not throw when mode changes', () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
-      chatManager.updateMode(CHAT_MODES.AGENT);
-
-      const session = chatManager.getCurrentSession();
-      expect(session!.messages[0].content).toBe(SYSTEM_PROMPTS[CHAT_MODES.AGENT]);
+      expect(() => chatManager.updateMode(CHAT_MODES.AGENT)).not.toThrow();
     });
 
     test('should not update if no session exists', () => {
@@ -152,25 +143,23 @@ describe('ChatManager', () => {
       session.messages.push({ role: 'user', content: 'Question 2', timestamp: Date.now() });
       chatManager.appendAssistantMessage('Response 2');
 
-      // Remove after first assistant message (index 1 in displayMessages)
-      // Should keep: system (0) + user (1) + assistant (2) = 3 messages
-      chatManager.removeMessagesAfterIndex(1);
+      // Remove after first assistant message (index 0 in displayMessages)
+      // Should keep: assistant (0) = 1 message
+      chatManager.removeMessagesAfterIndex(0);
 
       const updatedSession = chatManager.getCurrentSession();
-      expect(updatedSession!.messages.length).toBe(3); // system + first user + first assistant
+      expect(updatedSession!.messages.length).toBe(1); // first assistant
       expect(updatedSession!.fileContexts.length).toBe(0); // Should clear file contexts
     });
 
-    test('should keep system message', () => {
+    test('should remove messages correctly', () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
       chatManager.appendAssistantMessage('Response');
       // Remove after index 0 (first assistant in displayMessages)
-      // Should keep: system (0) + assistant (1) = 2 messages
       chatManager.removeMessagesAfterIndex(0);
 
       const session = chatManager.getCurrentSession();
-      expect(session!.messages.length).toBe(2); // system + assistant
-      expect(session!.messages[0].role).toBe('system');
+      expect(session!.messages.length).toBe(1); // assistant
     });
   });
 
@@ -210,26 +199,25 @@ describe('ChatManager', () => {
       chatManager.appendAssistantMessage('Response');
       const filePath = await chatManager.saveSession('Test Chat');
 
-      await chatManager.loadSession(filePath, CHAT_MODES.ASK);
+      await chatManager.loadSession(filePath);
 
       const session = chatManager.getCurrentSession();
       expect(session).not.toBeNull();
-      expect(session!.messages.length).toBeGreaterThan(1);
-      expect(session!.messages[0].role).toBe('system');
+      expect(session!.messages.length).toBeGreaterThan(0);
       expect(chatManager.getSessionTitle()).toBe('Test Chat');
     });
 
-    test('should add system message when loading', async () => {
+    test('should load messages without system message', async () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
       chatManager.appendAssistantMessage('Response');
       const filePath = await chatManager.saveSession('Test Chat');
 
-      await chatManager.loadSession(filePath, CHAT_MODES.PLAN);
+      await chatManager.loadSession(filePath);
 
       const session = chatManager.getCurrentSession();
-      const systemMessage = session!.messages.find(msg => msg.role === 'system');
-      expect(systemMessage).toBeDefined();
-      expect(systemMessage!.content).toBe(SYSTEM_PROMPTS[CHAT_MODES.PLAN]);
+      // System messages are no longer added
+      const systemMessages = session!.messages.filter(msg => msg.role === 'system');
+      expect(systemMessages.length).toBe(0);
     });
   });
 
@@ -242,11 +230,11 @@ describe('ChatManager', () => {
     });
 
     test('should set client to null if credentials are empty', async () => {
-      chatManager.updateClient('', '', '');
+      chatManager.updateClient('', '', undefined, undefined, undefined, undefined, undefined);
 
       // Should throw when trying to use null client
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
-      await expect(chatManager.sendMessage('Hello', 'gpt-4', CHAT_MODES.ASK)).rejects.toThrow();
+      await expect(chatManager.sendMessage('Hello', 'gpt-4', CHAT_MODES.ASK, false)).rejects.toThrow();
     });
   });
 
@@ -261,7 +249,7 @@ describe('ChatManager', () => {
       chatManager.appendAssistantMessage('Response');
       const filePath = await chatManager.saveSession('Test Chat');
 
-      await chatManager.loadSession(filePath, CHAT_MODES.ASK);
+      await chatManager.loadSession(filePath);
 
       expect(chatManager.getSessionTitle()).toBe('Test Chat');
     });

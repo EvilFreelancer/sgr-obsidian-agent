@@ -14,6 +14,7 @@ interface ChatProps {
   proxy?: string;
   defaultModel: string;
   defaultMode: ChatMode;
+  tavilyApiKey?: string;
   onModeChange: (mode: ChatMode) => Promise<void>;
   onModelChange: (model: string) => Promise<void>;
   onOpenSettings: () => void;
@@ -30,6 +31,7 @@ export const Chat: React.FC<ChatProps> = ({
   proxy,
   defaultModel,
   defaultMode,
+  tavilyApiKey,
   onModeChange: onModeChangeSettings,
   onModelChange: onModelChangeSettings,
   onOpenSettings,
@@ -44,6 +46,7 @@ export const Chat: React.FC<ChatProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [messagesBeforeEdit, setMessagesBeforeEdit] = useState<ChatMessage[] | null>(null);
+  const [enableWebSearch, setEnableWebSearch] = useState<boolean>(false);
   const isStreamingStoppedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -165,7 +168,7 @@ export const Chat: React.FC<ChatProps> = ({
     const updateInterval = 500; // Update file every 500ms
 
     try {
-      const stream = await chatManager.sendMessage(message, currentModel, mode);
+      const stream = await chatManager.sendMessage(message, currentModel, mode, enableWebSearch);
       
       // Process stream - accumulate content in streamingContent
       // ChatManager already updates session via appendAssistantMessage
@@ -354,6 +357,9 @@ export const Chat: React.FC<ChatProps> = ({
         initialValue={editingMessage || undefined}
         onInitialValueSet={handleInitialValueSet}
         onCancelEdit={editingMessage ? handleCancelEdit : undefined}
+        tavilyApiKey={tavilyApiKey}
+        enableWebSearch={enableWebSearch}
+        onWebSearchToggle={setEnableWebSearch}
       />
     </div>
   );

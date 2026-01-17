@@ -42,14 +42,45 @@ const context = await esbuild.context({
     "node:url",
     "node:buffer",
     "node:stream",
-    "node:crypto"
+    "node:crypto",
+    "path",
+    "http",
+    "https",
+    "net",
+    "tls",
+    "stream",
+    "util",
+    "url",
+    "buffer",
+    "crypto",
+    "fs",
+    "os",
+    "zlib",
+    "querystring",
+    "events",
+    "child_process",
+    "cluster",
+    "dgram",
+    "dns",
+    "readline",
+    "repl",
+    "string_decoder",
+    "timers",
+    "tty",
+    "v8",
+    "vm",
+    "worker_threads",
+    "assert",
+    "http-proxy-agent",
+    "https-proxy-agent",
+    "socks-proxy-agent"
   ],
   format: "cjs",
   target: "es2020",
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: "dist/sgr-obisidian-agent/main.js",
+  outfile: "dist/sgr-obsidian-agent/main.js",
   define: {
     global: "window",
     "process.env.NODE_ENV": prod ? '"production"' : '"development"',
@@ -59,8 +90,8 @@ const context = await esbuild.context({
 });
 
 // Ensure dist directory exists
-if (!fs.existsSync("dist/sgr-obisidian-agent/")) {
-  fs.mkdirSync("dist/sgr-obisidian-agent/", { recursive: true });
+if (!fs.existsSync("dist/sgr-obsidian-agent/")) {
+  fs.mkdirSync("dist/sgr-obsidian-agent/", { recursive: true });
 }
 
 // Copy manifest.json and styles.css to dist
@@ -71,14 +102,40 @@ const copyFile = (src, dest) => {
   }
 };
 
+// Copy files function
+const copyFiles = () => {
+  copyFile("manifest.json", "dist/sgr-obsidian-agent/manifest.json");
+  copyFile("styles.css", "dist/sgr-obsidian-agent/styles.css");
+};
+
 if (prod) {
   await context.rebuild();
-  copyFile("manifest.json", "dist/sgr-obisidian-agent/manifest.json");
-  copyFile("styles.css", "dist/sgr-obisidian-agent/styles.css");
+  copyFiles();
   process.exit(0);
 } else {
   // Copy files on initial build
-  copyFile("manifest.json", "dist/sgr-obisidian-agent/manifest.json");
-  copyFile("styles.css", "dist/sgr-obisidian-agent/styles.css");
+  copyFiles();
+  
+  // Watch for changes in manifest.json and styles.css
+  const watchFiles = ["manifest.json", "styles.css"];
+  const watchers = [];
+  
+  watchFiles.forEach((file) => {
+    const watcher = fs.watch(file, (eventType) => {
+      if (eventType === "change") {
+        console.log(`File ${file} changed, copying...`);
+        copyFiles();
+      }
+    });
+    watchers.push(watcher);
+  });
+  
+  // Watch for JS/TS changes
   await context.watch();
+  
+  // Cleanup watchers on exit
+  process.on("SIGINT", () => {
+    watchers.forEach((watcher) => watcher.close());
+    process.exit(0);
+  });
 }
