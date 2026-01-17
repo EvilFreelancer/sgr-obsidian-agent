@@ -344,31 +344,27 @@ export class ChatManager {
   }
 
   private extractFinalAnswer(parsed: any, message: ChatMessage): void {
-    if (!parsed.function || !parsed.function.arguments) {
+    if (!parsed.function) {
       return;
     }
 
     try {
+      // For final_answer, read from currentSituation field at the top level of JSON
+      if (parsed.currentSituation && typeof parsed.currentSituation === 'string') {
+        message.finalAnswer = parsed.currentSituation;
+        return;
+      }
+
+      // Fallback: try to read from function.arguments if currentSituation is not available
+      if (!parsed.function.arguments) {
+        return;
+      }
+
       let args = parsed.function.arguments;
       
       // If arguments is a string, try to parse it
       if (typeof args === 'string') {
-        try {
-          args = JSON.parse(args);
-        } catch {
-          // If parsing fails, try to extract answer directly from string
-          const answerMatch = args.match(/"answer"\s*:\s*"([^"]+)"/);
-          if (answerMatch) {
-            message.finalAnswer = answerMatch[1];
-            return;
-          }
-          // Try without quotes
-          const answerMatch2 = args.match(/"answer"\s*:\s*([^,}]+)/);
-          if (answerMatch2) {
-            message.finalAnswer = answerMatch2[1].trim().replace(/^["']|["']$/g, '');
-            return;
-          }
-        }
+        args = JSON.parse(args);
       }
 
       // If args is an object, look for answer field
