@@ -135,7 +135,7 @@ describe('ChatManager', () => {
   });
 
   describe('removeMessagesAfterIndex', () => {
-    test('should remove messages after specified index', () => {
+    test('should remove message at index and all messages after it', () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
       chatManager.appendAssistantMessage('Response 1');
       // Simulate user message
@@ -143,23 +143,42 @@ describe('ChatManager', () => {
       session.messages.push({ role: 'user', content: 'Question 2', timestamp: Date.now() });
       chatManager.appendAssistantMessage('Response 2');
 
-      // Remove after first assistant message (index 0 in displayMessages)
-      // Should keep: assistant (0) = 1 message
+      // Remove message at index 0 (first assistant) and all after it
+      // This is used when editing - we remove the old message and all subsequent messages
       chatManager.removeMessagesAfterIndex(0);
 
       const updatedSession = chatManager.getCurrentSession();
-      expect(updatedSession!.messages.length).toBe(1); // first assistant
+      expect(updatedSession!.messages.length).toBe(0); // All messages removed (including the one at index)
       expect(updatedSession!.fileContexts.length).toBe(0); // Should clear file contexts
     });
 
-    test('should remove messages correctly', () => {
+    test('should remove message at index correctly', () => {
       chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
       chatManager.appendAssistantMessage('Response');
-      // Remove after index 0 (first assistant in displayMessages)
+      // Remove message at index 0 (first assistant in displayMessages)
       chatManager.removeMessagesAfterIndex(0);
 
       const session = chatManager.getCurrentSession();
-      expect(session!.messages.length).toBe(1); // assistant
+      expect(session!.messages.length).toBe(0); // Message at index removed
+    });
+
+    test('should remove messages starting from user message index', () => {
+      chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
+      // Add user message
+      const session = chatManager.getCurrentSession()!;
+      session.messages.push({ role: 'user', content: 'Question 1', timestamp: Date.now() });
+      chatManager.appendAssistantMessage('Response 1');
+      session.messages.push({ role: 'user', content: 'Question 2', timestamp: Date.now() });
+      chatManager.appendAssistantMessage('Response 2');
+
+      // Remove from user message at index 2 (Question 2) and all after it
+      chatManager.removeMessagesAfterIndex(2);
+
+      const updatedSession = chatManager.getCurrentSession();
+      // Should keep: user (0), assistant (1) = 2 messages
+      expect(updatedSession!.messages.length).toBe(2);
+      expect(updatedSession!.messages[0].content).toBe('Question 1');
+      expect(updatedSession!.messages[1].content).toBe('Response 1');
     });
   });
 

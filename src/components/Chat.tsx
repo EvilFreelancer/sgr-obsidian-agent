@@ -45,10 +45,14 @@ export const Chat: React.FC<ChatProps> = ({
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
-  const [messagesBeforeEdit, setMessagesBeforeEdit] = useState<ChatMessage[] | null>(null);
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [enableWebSearch, setEnableWebSearch] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [stepHistory, setStepHistory] = useState<Array<{ step: number; toolName: string; timestamp: number }>>([]);
   const isStreamingStoppedRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const stepCounterRef = useRef(0);
 
   // Update messages when session changes
   const updateMessagesFromSession = useCallback(() => {
@@ -87,6 +91,9 @@ export const Chat: React.FC<ChatProps> = ({
       updateMessagesFromSession();
       setStreamingContent("");
       setIsStreaming(false);
+      // Clear editing state when starting new chat
+      setEditingMessage(null);
+      setEditingMessageIndex(null);
       // Clear last chat path when starting new chat
       if (onNewChat) {
         await onNewChat();
@@ -136,9 +143,15 @@ export const Chat: React.FC<ChatProps> = ({
       return;
     }
 
+    // If editing, remove messages after the edited message before sending
+    if (editingMessageIndex !== null) {
+      chatManager.removeMessagesAfterIndex(editingMessageIndex);
+      updateMessagesFromSession();
+    }
+    
     // Clear editing state when sending message
     setEditingMessage(null);
-    setMessagesBeforeEdit(null);
+    setEditingMessageIndex(null);
 
     // Ensure session exists
     let session = chatManager.getCurrentSession();
@@ -162,7 +175,48 @@ export const Chat: React.FC<ChatProps> = ({
 
     setIsStreaming(true);
     setStreamingContent("");
+    setError(null); // Clear previous error
     isStreamingStoppedRef.current = false;
+    
+    // Reset step tracking
+    stepCounterRef.current = 0;
+    setCurrentStep(0);
+    setStepHistory([]);
+
+    // Set up streaming callback to track steps
+    chatManager.setStreamingCallback({
+      onChunk: () => {
+        // Chunks are handled separately
+      },
+      onToolCall: (toolCallId: string, toolName: string, toolArguments: string) => {
+        // Track steps: each reasoning call starts a new step
+        if (toolName === 'reasoning') {
+          stepCounterRef.current += 1;
+          setCurrentStep(stepCounterRef.current);
+          setStepHistory(prev => [...prev, {
+            step: stepCounterRef.current,
+            toolName: toolName,
+            timestamp: Date.now()
+          }]);
+        } else {
+          // Other tools are part of the current step
+          setStepHistory(prev => {
+            const updated = [...prev];
+            if (updated.length > 0) {
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                toolName: toolName
+              };
+            }
+            return updated;
+          });
+        }
+      },
+      onFinish: () => {
+        // Reset callback after finish
+        chatManager.setStreamingCallback(null);
+      }
+    });
 
     let lastUpdateTime = Date.now();
     const updateInterval = 500; // Update file every 500ms
@@ -210,9 +264,50 @@ export const Chat: React.FC<ChatProps> = ({
       // Update messages after streaming completes and clear streaming content
       updateMessagesFromSession();
       setStreamingContent("");
+      
+      // Clear step tracking after completion
+      setCurrentStep(0);
+      setStepHistory([]);
+      chatManager.setStreamingCallback(null);
     } catch (error) {
       console.error("Failed to send message:", error);
       setStreamingContent("");
+      
+      // Extract error message for user
+      let errorMessage = "Failed to send message";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // Try to extract more user-friendly message from API errors
+        if (errorMessage.includes("timeout") || errorMessage.includes("too long")) {
+          errorMessage = "Agent execution timeout: The agent took too long to complete. " +
+            "This may indicate an infinite loop. Please try rephrasing your request or using a different mode (e.g., Ask mode for simple questions).";
+        } else if (errorMessage.includes("Payment Required") || errorMessage.includes("402")) {
+          errorMessage = "Payment Required: Please check your API subscription or billing.";
+        } else if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
+          errorMessage = "Unauthorized: Please check your API key in settings.";
+        } else if (errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
+          errorMessage = "Rate limit exceeded: Please try again later.";
+        } else if (errorMessage.includes("500") || errorMessage.includes("Internal Server Error")) {
+          errorMessage = "Server error: The API server encountered an error. Please try again later.";
+        } else if (errorMessage.includes("final_answer") && errorMessage.includes("required")) {
+          errorMessage = "Agent error: The agent failed to generate a proper response. " +
+            "This may happen with ambiguous requests. Please try rephrasing your question or using Ask mode for simple questions.";
+        }
+      }
+      setError(errorMessage);
+      
+      // Add error message to session as assistant message
+      const session = chatManager.getCurrentSession();
+      if (session) {
+        const errorMsg: ChatMessage = {
+          role: 'assistant',
+          content: `Error: ${errorMessage}`,
+          timestamp: Date.now(),
+        };
+        session.messages.push(errorMsg);
+        updateMessagesFromSession();
+      }
+      
       // Try to save what we have
       try {
         await chatManager.updateChatFile();
@@ -227,8 +322,10 @@ export const Chat: React.FC<ChatProps> = ({
     } finally {
       setIsStreaming(false);
       isStreamingStoppedRef.current = false;
+      // Clear callback on error
+      chatManager.setStreamingCallback(null);
     }
-  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession, onChatFileCreated]);
+  }, [chatManager, mode, model, defaultModel, updateMessagesFromSession, onChatFileCreated, enableWebSearch]);
 
   // Handle stop streaming
   const handleStop = useCallback(async () => {
@@ -260,15 +357,8 @@ export const Chat: React.FC<ChatProps> = ({
 
   // Handle edit message
   const handleEditMessage = useCallback((messageIndex: number, content: string) => {
-    // Save current messages state before editing
-    const session = chatManager.getCurrentSession();
-    if (session) {
-      setMessagesBeforeEdit([...session.messages]);
-    }
-    
-    // Remove all messages after the selected message
-    chatManager.removeMessagesAfterIndex(messageIndex);
-    updateMessagesFromSession();
+    // Save the index of the message being edited (don't remove messages yet)
+    setEditingMessageIndex(messageIndex);
     
     // Clean content from file blocks (keep only @ mentions)
     // Remove [File: path]...[/File] blocks
@@ -278,21 +368,20 @@ export const Chat: React.FC<ChatProps> = ({
     setEditingMessage(cleanedContent);
     setStreamingContent("");
     setIsStreaming(false);
-  }, [chatManager, updateMessagesFromSession]);
+    
+    // Don't remove messages yet - only remove when sending
+  }, []);
 
   // Handle cancel edit
   const handleCancelEdit = useCallback(() => {
-    if (messagesBeforeEdit && chatManager.getCurrentSession()) {
-      // Restore messages from before edit
-      const session = chatManager.getCurrentSession();
-      if (session) {
-        session.messages = [...messagesBeforeEdit];
-        updateMessagesFromSession();
-      }
-    }
+    // Restore removed messages if any were removed
+    chatManager.restoreRemovedMessages();
+    updateMessagesFromSession();
+    
+    // Clear editing state
     setEditingMessage(null);
-    setMessagesBeforeEdit(null);
-  }, [messagesBeforeEdit, chatManager, updateMessagesFromSession]);
+    setEditingMessageIndex(null);
+  }, [chatManager, updateMessagesFromSession]);
 
   // Handle initial value set (clear editing state)
   const handleInitialValueSet = useCallback(() => {
@@ -336,6 +425,9 @@ export const Chat: React.FC<ChatProps> = ({
           app={app}
           scrollContainerRef={scrollContainerRef}
           onEditMessage={handleEditMessage}
+          currentStep={currentStep}
+          stepHistory={stepHistory}
+          isStreaming={isStreaming}
         />
       </div>
       <ChatInput

@@ -10,6 +10,9 @@ interface ChatMessagesProps {
   app: App;
   scrollContainerRef?: React.RefObject<HTMLDivElement>;
   onEditMessage?: (messageIndex: number, content: string) => void;
+  currentStep?: number;
+  stepHistory?: Array<{ step: number; toolName: string; timestamp: number }>;
+  isStreaming?: boolean;
 }
 
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -18,6 +21,9 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   app,
   scrollContainerRef,
   onEditMessage,
+  currentStep = 0,
+  stepHistory = [],
+  isStreaming = false,
 }) => {
   // Remove JSON from content if it's already displayed in toolCalls
   const removeToolCallJSON = (content: string, toolCalls?: ToolCall[]): string => {
@@ -261,6 +267,22 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         </div>
       ))}
+      {isStreaming && currentStep > 0 && (
+        <div className="sgr-agent-steps">
+          <div className="sgr-agent-steps-header">
+            <span className="sgr-agent-steps-title">Agent Execution Steps</span>
+            <span className="sgr-agent-steps-current">Step {currentStep}</span>
+          </div>
+          <div className="sgr-agent-steps-list">
+            {stepHistory.map((stepInfo, idx) => (
+              <div key={idx} className={`sgr-agent-step ${idx === stepHistory.length - 1 ? 'sgr-agent-step-active' : ''}`}>
+                <span className="sgr-agent-step-number">Step {stepInfo.step}</span>
+                <span className="sgr-agent-step-tool">{stepInfo.toolName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {shouldShowStreaming && (
         <div className="sgr-message sgr-message-assistant sgr-message-streaming">
           <div className="sgr-message-content">

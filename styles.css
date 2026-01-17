@@ -1177,3 +1177,71 @@
 .sgr-final-answer {
   margin-top: 8px;
 }
+
+/* Agent Steps Display */
+.sgr-agent-steps {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.sgr-agent-steps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sgr-agent-steps-title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.sgr-agent-steps-current {
+  font-weight: 500;
+  color: var(--text-accent);
+  background: var(--background-modifier-border);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.sgr-agent-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sgr-agent-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.sgr-agent-step-active {
+  background: var(--background-modifier-hover);
+  border-color: var(--text-accent);
+}
+
+.sgr-agent-step-number {
+  font-weight: 600;
+  color: var(--text-normal);
+  min-width: 60px;
+}
+
+.sgr-agent-step-tool {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  text-transform: capitalize;
+}

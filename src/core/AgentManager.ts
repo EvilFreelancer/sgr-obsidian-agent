@@ -61,7 +61,7 @@ export class AgentManager {
     this.agentConfig = {
       llm: llmConfig,
       execution: {
-        maxIterations: 10,
+        maxIterations: 5,
         maxClarifications: 3,
         enableStreaming: true,
       },
@@ -213,6 +213,10 @@ export class AgentManager {
       throw new Error("Agent not initialized");
     }
 
+    // Timeout for agent execution (5 minutes)
+    const EXECUTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const startTime = Date.now();
+
     // Execute agent in background
     const executionPromise = this.currentAgent.execute().catch((error: Error) => {
       streamError.value = error;
@@ -221,6 +225,17 @@ export class AgentManager {
 
     // Stream chunks as they arrive
     while (!streamFinished.value && !streamError.value) {
+      // Check for timeout
+      const elapsed = Date.now() - startTime;
+      if (elapsed > EXECUTION_TIMEOUT) {
+        streamError.value = new Error(
+          "Agent execution timeout: The agent took too long to complete. " +
+          "This may indicate an infinite loop. Please try rephrasing your request or using a different mode."
+        );
+        streamFinished.value = true;
+        break;
+      }
+
       if (chunks.length > 0) {
         const chunk = chunks.shift()!;
         yield chunk;
@@ -235,8 +250,22 @@ export class AgentManager {
       yield chunks.shift()!;
     }
 
-    // Wait for execution to complete
-    await executionPromise;
+    // Wait for execution to complete (with timeout)
+    try {
+      await Promise.race([
+        executionPromise,
+        new Promise<void>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("Execution promise timeout"));
+          }, 1000); // Give 1 second for promise to resolve after stream finished
+        }),
+      ]);
+    } catch (error) {
+      // Ignore timeout errors if stream already finished
+      if (!streamFinished.value && !streamError.value) {
+        streamError.value = error instanceof Error ? error : new Error(String(error));
+      }
+    }
 
     if (streamError.value) {
       throw streamError.value;

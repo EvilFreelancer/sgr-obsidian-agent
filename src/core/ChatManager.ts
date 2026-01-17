@@ -23,6 +23,7 @@ export class ChatManager {
   private currentTemperature: number = 0.7;
   private currentMaxTokens: number = 2000;
   private currentTavilyApiKey: string | undefined = undefined;
+  private removedMessages: ChatMessage[] = []; // Store removed messages for undo
 
   constructor(
     messageRepo: MessageRepository,
@@ -72,6 +73,12 @@ export class ChatManager {
     } else {
       this.llmClient = null;
       this.agentManager = null;
+    }
+  }
+
+  setStreamingCallback(callback: any): void {
+    if (this.agentManager) {
+      this.agentManager.setStreamingCallback(callback);
     }
   }
 
@@ -349,34 +356,61 @@ export class ChatManager {
     }
 
     try {
-      // For final_answer, read from currentSituation field at the top level of JSON
+      const isFinalAnswer = parsed.function.toolName === 'final_answer';
+      
+      // For final_answer tool, prioritize function.arguments.content
+      if (isFinalAnswer && parsed.function.arguments) {
+        let args = parsed.function.arguments;
+        
+        // If arguments is a string, try to parse it
+        if (typeof args === 'string') {
+          args = JSON.parse(args);
+        }
+
+        // If args is an object, look for content field first
+        if (typeof args === 'object' && args !== null) {
+          if (args.content) {
+            message.finalAnswer = typeof args.content === 'string' ? args.content : JSON.stringify(args.content);
+            return;
+          } else if (args.answer) {
+            message.finalAnswer = typeof args.answer === 'string' ? args.answer : JSON.stringify(args.answer);
+            return;
+          } else if (args.text) {
+            message.finalAnswer = typeof args.text === 'string' ? args.text : JSON.stringify(args.text);
+            return;
+          } else if (args.message) {
+            message.finalAnswer = typeof args.message === 'string' ? args.message : JSON.stringify(args.message);
+            return;
+          }
+        }
+      }
+
+      // Fallback: read from currentSituation field at the top level of JSON
       if (parsed.currentSituation && typeof parsed.currentSituation === 'string') {
         message.finalAnswer = parsed.currentSituation;
         return;
       }
 
-      // Fallback: try to read from function.arguments if currentSituation is not available
-      if (!parsed.function.arguments) {
-        return;
-      }
+      // Last fallback: try to read from function.arguments if currentSituation is not available
+      if (!isFinalAnswer && parsed.function.arguments) {
+        let args = parsed.function.arguments;
+        
+        // If arguments is a string, try to parse it
+        if (typeof args === 'string') {
+          args = JSON.parse(args);
+        }
 
-      let args = parsed.function.arguments;
-      
-      // If arguments is a string, try to parse it
-      if (typeof args === 'string') {
-        args = JSON.parse(args);
-      }
-
-      // If args is an object, look for answer field
-      if (typeof args === 'object' && args !== null) {
-        if (args.answer) {
-          message.finalAnswer = typeof args.answer === 'string' ? args.answer : JSON.stringify(args.answer);
-        } else if (args.content) {
-          message.finalAnswer = typeof args.content === 'string' ? args.content : JSON.stringify(args.content);
-        } else if (args.text) {
-          message.finalAnswer = typeof args.text === 'string' ? args.text : JSON.stringify(args.text);
-        } else if (args.message) {
-          message.finalAnswer = typeof args.message === 'string' ? args.message : JSON.stringify(args.message);
+        // If args is an object, look for answer field
+        if (typeof args === 'object' && args !== null) {
+          if (args.answer) {
+            message.finalAnswer = typeof args.answer === 'string' ? args.answer : JSON.stringify(args.answer);
+          } else if (args.content) {
+            message.finalAnswer = typeof args.content === 'string' ? args.content : JSON.stringify(args.content);
+          } else if (args.text) {
+            message.finalAnswer = typeof args.text === 'string' ? args.text : JSON.stringify(args.text);
+          } else if (args.message) {
+            message.finalAnswer = typeof args.message === 'string' ? args.message : JSON.stringify(args.message);
+          }
         }
       }
     } catch (e) {
@@ -397,17 +431,34 @@ export class ChatManager {
     // No system message anymore, so use index directly
     const actualIndex = messageIndex;
     
-    // Keep messages up to and including the selected message
-    this.currentSession.messages = this.currentSession.messages.slice(0, actualIndex + 1);
+    // Save removed messages for potential undo
+    const removed = this.currentSession.messages.slice(actualIndex);
+    this.removedMessages = removed;
+    
+    // Remove the message at index and all messages after it
+    // This is used when editing a message - we want to remove the old message
+    // and all subsequent messages, then add the new edited message
+    this.currentSession.messages = this.currentSession.messages.slice(0, actualIndex);
     
     // Clear file contexts when editing (user can re-add them if needed)
     this.currentSession.fileContexts = [];
+  }
+
+  restoreRemovedMessages(): void {
+    if (!this.currentSession || this.removedMessages.length === 0) {
+      return;
+    }
+
+    // Restore removed messages
+    this.currentSession.messages = [...this.currentSession.messages, ...this.removedMessages];
+    this.removedMessages = [];
   }
 
   clearSession(): void {
     this.currentSession = null;
     this.sessionTimestamp = null;
     this.currentChatFilePath = null;
+    this.removedMessages = [];
   }
 
   async autoSaveSession(): Promise<string | null> {

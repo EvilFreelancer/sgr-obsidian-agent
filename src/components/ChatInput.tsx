@@ -198,12 +198,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       lastIndex = match.index + match[0].length;
     }
 
-    // Add remaining text
-    if (lastIndex < text.length) {
+    // Add remaining text (only if we processed some mentions, otherwise we'll add it below)
+    if (lastIndex > 0 && lastIndex < text.length) {
       fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
     }
 
-    // If no mentions found, just add the text
+    // If no mentions found, just add the text once
     if (lastIndex === 0) {
       fragment.appendChild(document.createTextNode(text));
     }
@@ -213,11 +213,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setHasContent(text.trim().length > 0);
   };
 
+  // Track last initialValue to avoid duplicate setting
+  const lastInitialValueRef = useRef<string | undefined>(undefined);
+  const isSettingValueRef = useRef(false);
+
   // Handle initial value from parent (for editing messages)
   useEffect(() => {
-    if (initialValue !== undefined && inputRef.current) {
+    if (initialValue !== undefined && inputRef.current && 
+        initialValue !== lastInitialValueRef.current && 
+        !isSettingValueRef.current) {
+      // Mark that we're setting value to prevent duplicate calls
+      isSettingValueRef.current = true;
+      
+      // Clear input first to avoid duplication
+      inputRef.current.textContent = "";
+      setFileContexts([]);
+      
+      // Update ref before parsing to prevent duplicate calls
+      lastInitialValueRef.current = initialValue;
+      
       // Parse file mentions and create labels
       parseFileMentions(initialValue).then(() => {
+        isSettingValueRef.current = false;
         if (onInitialValueSet) {
           onInitialValueSet();
         }
@@ -232,7 +249,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           selection.removeAllRanges();
           selection.addRange(range);
         }
+      }).catch(() => {
+        isSettingValueRef.current = false;
       });
+    } else if (initialValue === undefined) {
+      // Reset ref when initialValue is cleared
+      lastInitialValueRef.current = undefined;
+      isSettingValueRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValue, onInitialValueSet, app]);
