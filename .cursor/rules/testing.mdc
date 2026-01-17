@@ -1,0 +1,221 @@
+# Testing Rules
+
+## Test Framework
+
+The project uses **Vitest** as the test framework. All tests are located in the `tests/` directory.
+
+## Test Structure
+
+```
+tests/
+├── core/              # Unit tests for core modules
+│   ├── ChatManager.test.ts
+│   ├── LLMClient.test.ts
+│   └── MessageRepository.test.ts
+├── settings/          # Tests for settings
+│   └── model.test.ts
+├── utils/             # Tests for utility functions
+│   └── bm25-search.test.ts
+├── integration/      # Integration tests
+│   ├── chat-session-persistence.test.ts
+│   └── auto-save-chat-history.test.ts
+└── mocks/            # Shared mocks
+    └── obsidian.ts   # Obsidian API mocks
+```
+
+## Running Tests
+
+```bash
+# Run all tests once
+npm test
+
+# Run tests in watch mode (for development)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+## Test Coverage Guidelines
+
+### What to Test (70%+ coverage target)
+
+**Core Business Logic:**
+- Session management (start, save, load, clear)
+- File operations (save, load, delete, list)
+- Message handling (append, remove, format)
+- File context management (add, remove)
+- Settings validation and defaults
+- Error handling (network errors, API errors, validation errors)
+- Data format conversions (JSON parsing, SSE streaming)
+
+**Key Algorithms:**
+- BM25 search implementation
+- Title generation logic
+- File path sanitization
+- Timestamp extraction
+
+### What NOT to Test
+
+**Dynamic/Changing Behavior:**
+- UI interactions and React component rendering
+- Timestamps and dates (unless testing specific logic)
+- Random values or UUIDs
+- Network timing and delays
+- File system permissions (use mocks)
+
+**Third-Party Code:**
+- Obsidian API internals (use mocks)
+- React library behavior
+- External API responses (mock them)
+
+## Writing Tests
+
+### Test File Naming
+
+- Test files: `*.test.ts`
+- One test file per source file
+- Place tests in corresponding directory structure
+
+### Test Structure
+
+```typescript
+import { describe, test, expect, beforeEach } from 'vitest';
+import { ClassToTest } from '../../src/path/to/ClassToTest';
+import { MockApp } from '../mocks/obsidian';
+
+describe('ClassToTest', () => {
+  let mockApp: MockApp;
+  let instance: ClassToTest;
+
+  beforeEach(() => {
+    mockApp = new MockApp();
+    instance = new ClassToTest(mockApp as any);
+  });
+
+  describe('methodName', () => {
+    test('should do something specific', () => {
+      // Arrange
+      const input = 'test';
+      
+      // Act
+      const result = instance.methodName(input);
+      
+      // Assert
+      expect(result).toBe('expected');
+    });
+  });
+});
+```
+
+### Using Mocks
+
+**Obsidian API Mocks:**
+- Use `MockApp`, `MockVault`, `MockTFile` from `tests/mocks/obsidian.ts`
+- Never use real Obsidian API in tests
+
+**Network Mocks:**
+- Mock `fetch` using `vi.fn()` for LLMClient tests
+- Use `global.fetch = vi.fn()` to mock network requests
+
+### Test Organization
+
+1. **Unit Tests** (`tests/core/`, `tests/settings/`, `tests/utils/`):
+   - Test individual classes/functions in isolation
+   - Use mocks for dependencies
+   - Focus on specific behavior
+
+2. **Integration Tests** (`tests/integration/`):
+   - Test interactions between multiple modules
+   - Test complete workflows
+   - Use real module interactions (with mocked external dependencies)
+
+### Best Practices
+
+1. **One assertion per test** (when possible) - makes failures clear
+2. **Descriptive test names** - "should do X when Y" format
+3. **Arrange-Act-Assert** pattern
+4. **Use beforeEach** for common setup
+5. **Test edge cases** - empty inputs, null values, error conditions
+6. **Test error handling** - verify correct errors are thrown
+7. **Keep tests independent** - no shared state between tests
+
+### Example: Testing Core Module
+
+```typescript
+import { describe, test, expect, beforeEach } from 'vitest';
+import { ChatManager } from '../../src/core/ChatManager';
+import { MessageRepository } from '../../src/core/MessageRepository';
+import { CHAT_MODES } from '../../src/constants';
+import { MockApp } from '../mocks/obsidian';
+
+describe('ChatManager', () => {
+  let mockApp: MockApp;
+  let messageRepo: MessageRepository;
+  let chatManager: ChatManager;
+
+  beforeEach(() => {
+    mockApp = new MockApp();
+    messageRepo = new MessageRepository(mockApp as any, 'Chat History');
+    chatManager = new ChatManager(
+      messageRepo,
+      mockApp as any,
+      'https://api.example.com',
+      'test-key'
+    );
+  });
+
+  describe('startSession', () => {
+    test('should create new session with system message', () => {
+      chatManager.startSession(CHAT_MODES.ASK, 'gpt-4');
+      
+      const session = chatManager.getCurrentSession();
+      expect(session).not.toBeNull();
+      expect(session!.messages[0].role).toBe('system');
+    });
+  });
+});
+```
+
+### Example: Testing with Network Mocks
+
+```typescript
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { LLMClient } from '../../src/core/LLMClient';
+
+global.fetch = vi.fn();
+
+describe('LLMClient', () => {
+  let client: LLMClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    client = new LLMClient('https://api.example.com', 'test-key');
+  });
+
+  test('should fetch models successfully', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [{ id: 'gpt-4' }] }),
+    });
+
+    const models = await client.fetchModels();
+    expect(models.length).toBe(1);
+  });
+});
+```
+
+## Test Configuration
+
+Tests are configured in `vitest.config.ts`:
+- Environment: Node.js
+- Coverage provider: v8
+- Test files: `tests/**/*.test.ts`
+- Coverage excludes: node_modules, dist, tests themselves
+
+## References
+
+- Vitest documentation: https://vitest.dev/
+- Project architecture: @architecture.mdc
+- Code style: @code-style.mdc

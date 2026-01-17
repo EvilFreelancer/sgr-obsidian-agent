@@ -239,6 +239,34 @@ After building, all plugin files will be in the `dist/sgr-obsidian-agent/` folde
 
 Copy these files to your Obsidian vault's `.obsidian/plugins/sgr-obsidian-agent/` folder to use the plugin.
 
+### Testing
+
+The project uses [Vitest](https://vitest.dev/) for testing. Tests are located in the `tests/` directory.
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+**Test Structure:**
+- `tests/core/` - Unit tests for core modules (ChatManager, LLMClient, MessageRepository)
+- `tests/settings/` - Tests for settings validation and defaults
+- `tests/utils/` - Tests for utility functions (BM25 search, etc.)
+- `tests/integration/` - Integration tests for complex workflows
+- `tests/mocks/` - Shared mocks for Obsidian API
+
+**Test Coverage:**
+- Tests focus on key business logic and critical paths
+- Coverage target: 70%+ (without fanaticism)
+- Dynamic/changing behavior is not tested (e.g., UI interactions, timestamps)
+- Core functionality is thoroughly tested: session management, file operations, API communication
+
 ### Code Style
 
 - All code comments in English

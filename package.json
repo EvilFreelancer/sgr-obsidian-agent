@@ -5,7 +5,10 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "SGR",
@@ -14,9 +17,11 @@
     "@types/node": "^16.11.6",
     "@types/react": "^18.0.33",
     "@types/react-dom": "^18.0.11",
+    "@vitest/coverage-v8": "^1.6.0",
     "esbuild": "^0.25.0",
     "obsidian": "^1.2.5",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "react": "^18.2.0",
